@@ -17,6 +17,10 @@ facing_direction = "right"
 # A variable to store the phone's current orientation
 last_known_orientation = {"x": 0, "y": 0, "z": 0, "w": 1}
 
+# --- NEW: Walk Fuel System ---
+walk_fuel_seconds = 0.0
+last_frame_time = time.time()
+
 
 # --- NEW: The core mathematical helper function ---
 def rotate_vector_by_quaternion(vector, quat):
@@ -77,8 +81,8 @@ config = load_config()
 # Extract configuration values
 LISTEN_IP = config["network"]["listen_ip"]
 LISTEN_PORT = config["network"]["listen_port"]
-WALK_TIMEOUT = config["thresholds"]["walk_timeout_sec"]
-STEP_DEBOUNCE = config["thresholds"]["step_debounce_sec"]
+FUEL_ADDED_PER_STEP = config["thresholds"]["fuel_added_per_step_sec"]
+MAX_FUEL_CAPACITY = config["thresholds"]["max_fuel_sec"]
 PUNCH_THRESHOLD = config["thresholds"]["punch_threshold_xy_accel"]
 JUMP_THRESHOLD = config["thresholds"]["jump_threshold_z_accel"]
 TURN_THRESHOLD = config["thresholds"]["turn_threshold_degrees"]
@@ -173,7 +177,22 @@ try:
     while True:
         data, addr = sock.recvfrom(2048)
 
-        if is_walking and time.time() - last_step_time > WALK_TIMEOUT:
+        # --- NEW: Walk Fuel System Logic ---
+        current_time = time.time()
+        delta_time = current_time - last_frame_time
+        last_frame_time = current_time
+
+        # Deplete fuel over time
+        walk_fuel_seconds = max(0.0, walk_fuel_seconds - delta_time)
+
+        # Start walking if we have fuel and aren't already walking
+        if walk_fuel_seconds > 0 and not is_walking and walking_thread is None:
+            stop_walking_event.clear()
+            walking_thread = threading.Thread(target=walker_thread_func)
+            walking_thread.start()
+
+        # Stop walking if we're out of fuel
+        elif walk_fuel_seconds <= 0 and is_walking:
             stop_walking_event.set()
             if walking_thread is not None:
                 walking_thread.join()
@@ -220,13 +239,11 @@ try:
                         orientation_history.clear()
 
             elif sensor_type == "step_detector":
-                now = time.time()
-                if now - last_step_time > STEP_DEBOUNCE:
-                    last_step_time = now
-                    if not is_walking and walking_thread is None:
-                        stop_walking_event.clear()
-                        walking_thread = threading.Thread(target=walker_thread_func)
-                        walking_thread.start()
+                # --- NEW: Simple fuel addition system ---
+                # Add fuel to the tank, capping at maximum capacity
+                new_fuel = walk_fuel_seconds + FUEL_ADDED_PER_STEP
+                walk_fuel_seconds = min(MAX_FUEL_CAPACITY, new_fuel)
+                # Note: Walking start/stop logic is now handled in main loop
 
             # --- REFACTORED: Acceleration logic now uses world coordinates ---
             elif sensor_type == "linear_acceleration":
@@ -288,10 +305,19 @@ try:
             #         peak_yaw_rate = 0.0  # Reset after action
 
             walk_status = "WALKING" if is_walking else "IDLE"
-            # Updated dashboard to show world coordinates instead of device
+
+            # Create walk fuel bar visualization
+            fuel_percentage = walk_fuel_seconds / MAX_FUEL_CAPACITY
+            fuel_bar_length = 8
+            filled_bars = int(fuel_percentage * fuel_bar_length)
+            empty_bars = fuel_bar_length - filled_bars
+            fuel_bar = "[" + "#" * filled_bars + "-" * empty_bars + "]"
+
+            # Updated dashboard to show world coordinates and walk fuel
             dashboard_string = (
                 f"\rFacing: {facing_direction.upper().ljust(7)} | "
-                f"Walk: {walk_status.ljust(10)} | "
+                f"Walk: {walk_status.ljust(7)} | "
+                f"Fuel: {fuel_bar} {walk_fuel_seconds:.1f}s | "
                 f"World Z-A:{peak_z_accel:4.1f} | "
                 f"World XY-A:{peak_xy_accel:4.1f} | "
                 f"Yaw:{peak_yaw_rate:3.1f}"

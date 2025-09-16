@@ -302,12 +302,17 @@ def calibrate_turn(config, sock):
 
 
 def calibrate_walking(config, sock):
-    """Guides user through rhythm test to calibrate walking parameters."""
+    """Guides user through rhythm test to calibrate walking fuel parameters."""
 
     instruction_message = (
-        "--- Calibrating WALKING RHYTHM ---\n\n"
+        "--- Calibrating WALKING FUEL SYSTEM ---\n\n"
         "Please remain in your TRAVEL STANCE.\n\n"
-        "We will record your natural walking pace for 10 seconds."
+        "We will record your natural walking pace for 10 seconds.\n"
+        "This will be used to calculate your personalized 'walk fuel' parameters.\n\n"
+        "The new system works like a fuel tank:\n"
+        "- Each step adds fuel to your walking 'tank'\n"
+        "- Being idle slowly drains the fuel\n"
+        "- Your character walks as long as there's fuel in the tank"
     )
     show_instructions(instruction_message)
     print("Get ready to walk in place at a comfortable, natural pace.")
@@ -371,24 +376,45 @@ def calibrate_walking(config, sock):
 
     avg_interval = statistics.mean(intervals)
 
-    # New debounce is a fraction of their average step time
-    new_debounce = avg_interval * 0.75
-    # New timeout is a multiple of their average step time
-    new_timeout = avg_interval * 2.5
+    # NEW FUEL MODEL CALCULATIONS:
+    # Each step gives you fuel for longer than your natural step interval
+    # This creates a comfortable buffer for natural rhythm variations
+    fuel_added_per_step = avg_interval * 2.0  # Each step gives 2x your natural interval
 
-    print("\n--- Walking Analysis Complete ---")
+    # Maximum fuel capacity prevents infinite accumulation but allows for bursts
+    max_fuel_capacity = avg_interval * 3.0  # Tank can hold 3x your natural interval
+
+    # Alternative: if you want to be more conservative, use smaller multipliers:
+    # fuel_added_per_step = avg_interval * 1.5
+    # max_fuel_capacity = avg_interval * 2.5
+
+    print("\n--- Walking Fuel Analysis Complete ---")
     print(
         f"Detected {len(step_timestamps)} steps with an average time of "
         f"{avg_interval:.2f}s between steps."
     )
+    print(f"\nNew Fuel System Parameters:")
+    print(f"  Fuel added per step: {fuel_added_per_step:.2f}s")
+    print(f"  Maximum fuel capacity: {max_fuel_capacity:.2f}s")
+    print(f"\nThis means:")
+    print(f"  - Each step gives you {fuel_added_per_step:.1f}s of walking time")
+    print(f"  - You can accumulate up to {max_fuel_capacity:.1f}s of fuel")
+    print(f"  - Natural rhythm variations will feel smooth and fluid")
 
-    prev_debounce = config["thresholds"]["step_debounce_sec"]
-    prev_timeout = config["thresholds"]["walk_timeout_sec"]
-    print(f"Previous Debounce: {prev_debounce:.2f}s | New: {new_debounce:.2f}s")
-    print(f"Previous Timeout:  {prev_timeout:.2f}s | New: {new_timeout:.2f}s")
+    # Update config with new fuel parameters
+    config["thresholds"]["fuel_added_per_step_sec"] = fuel_added_per_step
+    config["thresholds"]["max_fuel_sec"] = max_fuel_capacity
 
-    config["thresholds"]["step_debounce_sec"] = new_debounce
-    config["thresholds"]["walk_timeout_sec"] = new_timeout
+    # Show comparison with old system if it existed
+    try:
+        if "step_debounce_sec" in config["thresholds"]:
+            prev_debounce = config["thresholds"]["step_debounce_sec"]
+            prev_timeout = config["thresholds"]["walk_timeout_sec"]
+            print(f"\nReplaced old system:")
+            print(f"  Old Debounce: {prev_debounce:.2f}s -> New Fuel System (no hard debounce)")
+            print(f"  Old Timeout:  {prev_timeout:.2f}s -> New Fuel System (gradual depletion)")
+    except KeyError:
+        pass
 
 
 def main():
