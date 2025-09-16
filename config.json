@@ -1,19 +1,19 @@
 {
-    "network": {
-        "listen_ip": "10.13.23.16",
-        "listen_port": 12345
-    },
-    "thresholds": {
-        "walk_timeout_sec": 1.4464719593524933,
-        "step_debounce_sec": 0.433941587805748,
-        "punch_threshold_xy_accel": 23.99,
-        "jump_threshold_z_accel": 25.85,
-        "turn_threshold_degrees": 90.0
-    },
-    "keyboard_mappings": {
-        "left": "Key.left",
-        "right": "Key.right",
-        "jump": "z",
-        "attack": "x"
-    }
+  "network": {
+    "listen_ip": "10.13.23.16",
+    "listen_port": 12345
+  },
+  "thresholds": {
+    "walk_timeout_sec": 1,
+    "step_debounce_sec": 1,
+    "punch_threshold_xy_accel": 23.99,
+    "jump_threshold_z_accel": 25.85,
+    "turn_threshold_degrees": 90.0
+  },
+  "keyboard_mappings": {
+    "left": "Key.left",
+    "right": "Key.right",
+    "jump": "z",
+    "attack": "x"
+  }
 }

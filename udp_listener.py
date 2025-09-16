@@ -82,6 +82,8 @@ STEP_DEBOUNCE = config["thresholds"]["step_debounce_sec"]
 PUNCH_THRESHOLD = config["thresholds"]["punch_threshold_xy_accel"]
 JUMP_THRESHOLD = config["thresholds"]["jump_threshold_z_accel"]
 TURN_THRESHOLD = config["thresholds"]["turn_threshold_degrees"]
+# NEW: Hardcoded stability threshold for pitch/roll stability check
+STABILITY_THRESHOLD_DEGREES = 40.0
 
 # Load key mappings from config
 KEY_MAP = {
@@ -117,6 +119,30 @@ def quaternion_to_roll(qx, qy, qz, qw):
     return math.degrees(roll)
 
 
+def quaternion_to_euler(q):
+    """Converts a quaternion dict into yaw, pitch, roll in degrees."""
+    x, y, z, w = q['x'], q['y'], q['z'], q['w']
+
+    # Roll (x-axis rotation)
+    sinr_cosp = 2 * (w * x + y * z)
+    cosr_cosp = 1 - 2 * (x * x + y * y)
+    roll = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
+
+    # Pitch (y-axis rotation)
+    sinp = 2 * (w * y - z * x)
+    if abs(sinp) >= 1:
+        pitch = math.degrees(math.copysign(math.pi / 2, sinp))
+    else:
+        pitch = math.degrees(math.asin(sinp))
+
+    # Yaw (z-axis rotation) - This is our Azimuth
+    siny_cosp = 2 * (w * z + x * y)
+    cosy_cosp = 1 - 2 * (y * y + z * z)
+    yaw = math.degrees(math.atan2(siny_cosp, cosy_cosp))
+
+    return yaw, pitch, roll
+
+
 # --- Main Listener Logic ---
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((LISTEN_IP, LISTEN_PORT))
@@ -138,9 +164,10 @@ current_tilt_state = "CENTERED"
 peak_z_accel = 0.0
 peak_xy_accel = 0.0
 peak_yaw_rate = 0.0  # NEW: for tuning the turn
-# NEW: A buffer to store recent azimuth history for turn detection
+# NEW: A buffer to store recent orientation history for turn detection
 # We'll store ~0.5 seconds of data (at 50Hz, that's 25 samples)
-azimuth_history = deque(maxlen=25)
+# Modified to store full orientation tuples (yaw, pitch, roll)
+orientation_history = deque(maxlen=25)
 
 try:
     while True:
@@ -156,40 +183,41 @@ try:
             parsed_json = json.loads(data.decode())
             sensor_type = parsed_json.get("sensor")
 
-            # NEW: Rotation vector now used for turn detection via azimuth
+            # NEW: Rotation vector now used for turn detection with stability check
             if sensor_type == "rotation_vector":
                 vals = parsed_json["values"]
 
                 # Store the orientation for world coordinate transformation
                 last_known_orientation.update(vals)
 
-                # Convert quaternion to azimuth for turn detection
-                siny_cosp = 2 * (vals["w"] * vals["z"] + vals["x"] * vals["y"])
-                cosy_cosp = 1 - 2 * (vals["y"] ** 2 + vals["z"] ** 2)
-                current_azimuth = math.degrees(math.atan2(siny_cosp, cosy_cosp))
+                # Convert quaternion to all three Euler angles
+                yaw, pitch, roll = quaternion_to_euler(vals)
 
-                # Add current reading to our history
-                azimuth_history.append(current_azimuth)
+                # Add current orientation to our history
+                orientation_history.append({'yaw': yaw, 'pitch': pitch, 'roll': roll})
 
                 # Check for a turn only if our history buffer is full
-                if len(azimuth_history) == azimuth_history.maxlen:
-                    oldest_azimuth = azimuth_history[0]
-                    # Calculate the shortest angle difference
-                    angle_diff = abs(current_azimuth - oldest_azimuth)
-                    if angle_diff > 180:
-                        angle_diff = 360 - angle_diff
+                if len(orientation_history) == orientation_history.maxlen:
+                    oldest_orientation = orientation_history[0]
+                    current_orientation = orientation_history[-1]
 
-                    if angle_diff > TURN_THRESHOLD:
-                        print(
-                            f"\n--- TURN DETECTED! " f"({angle_diff:.1f}° change) ---"
-                        )
+                    # Calculate change in all three angles
+                    yaw_diff = 180 - abs(abs(current_orientation['yaw'] - oldest_orientation['yaw']) - 180)
+                    pitch_diff = abs(current_orientation['pitch'] - oldest_orientation['pitch'])
+                    roll_diff = abs(current_orientation['roll'] - oldest_orientation['roll'])
+
+                    # NEW: The Stability Check
+                    is_stable = (pitch_diff < STABILITY_THRESHOLD_DEGREES) and (roll_diff < STABILITY_THRESHOLD_DEGREES)
+
+                    if yaw_diff > TURN_THRESHOLD and is_stable:
+                        print("\n--- STABLE TURN DETECTED! ---")
                         if facing_direction == "right":
                             facing_direction = "left"
                         else:
                             facing_direction = "right"
                         print(f"Now facing {facing_direction.upper()}")
                         # Clear to prevent multiple triggers
-                        azimuth_history.clear()
+                        orientation_history.clear()
 
             elif sensor_type == "step_detector":
                 now = time.time()
