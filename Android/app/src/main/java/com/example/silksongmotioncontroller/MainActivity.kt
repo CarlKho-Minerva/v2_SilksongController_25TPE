@@ -25,10 +25,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private var rotationVectorSensor: Sensor? = null
     private var stepDetectorSensor: Sensor? = null
+    // --- NEW: Add a property for the Linear Acceleration Sensor ---
+    private var linearAccelerationSensor: Sensor? = null
 
     // --- NEW: Views for status feedback ---
     private lateinit var rotationStatusView: TextView
     private lateinit var stepStatusView: TextView
+    // --- NEW: UI View for the new sensor ---
+    private lateinit var accelStatusView: TextView
 
     private val MAC_IP_ADDRESS = "192.168.10.234"
     private val UDP_PORT = 12345
@@ -43,12 +47,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val streamSwitch: SwitchCompat = findViewById(R.id.switch_stream)
         rotationStatusView = findViewById(R.id.tv_status_rotation) // Assuming you added this
         stepStatusView = findViewById(R.id.tv_status_step)
+        // --- NEW: Initialize the new TextView ---
+        accelStatusView = findViewById(R.id.tv_status_accel)
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
         // Initialize sensors, but don't use them yet
         rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+        // --- NEW: Initialize the Linear Acceleration sensor ---
+        linearAccelerationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
         updateSensorStatusUI()
 
@@ -91,6 +99,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun updateSensorStatusUI() {
         rotationStatusView.text = if (rotationVectorSensor != null) "Rotation Vector: Ready" else "Rotation Vector: NOT AVAILABLE"
+        accelStatusView.text = if (linearAccelerationSensor != null) "Linear Accel: Ready" else "Linear Accel: NOT AVAILABLE"
 
         val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
         stepStatusView.text = when {
@@ -101,7 +110,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun startStreaming() {
+        // --- MODIFIED: Register all sensors including the new linear acceleration sensor ---
         sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME)
+        sensorManager.registerListener(this, linearAccelerationSensor, SensorManager.SENSOR_DELAY_GAME)
 
         // Only register the step detector if we have permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
@@ -128,6 +139,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
             Sensor.TYPE_STEP_DETECTOR -> {
                 val jsonPayload = """{"sensor": "step_detector", "timestamp_ns": ${event.timestamp}}"""
+                sendData(jsonPayload)
+            }
+            // --- NEW: Handle events from the Linear Accelerometer ---
+            Sensor.TYPE_LINEAR_ACCELERATION -> {
+                val values = event.values
+                val jsonPayload = """{"sensor": "linear_acceleration", "timestamp_ns": ${event.timestamp}, "values": {"x": ${values[0]}, "y": ${values[1]}, "z": ${values[2]}}}"""
                 sendData(jsonPayload)
             }
         }

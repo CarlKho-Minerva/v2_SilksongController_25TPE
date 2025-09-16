@@ -29,6 +29,17 @@
         app:layout_constraintVertical_bias="0.425" />
 
     <TextView
+        android:id="@+id/tv_status_accel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Linear Accel: Initializing..."
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/switch_stream"
+        app:layout_constraintVertical_bias="0.81" />
+
+    <TextView
         android:id="@+id/tv_status_rotation"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
