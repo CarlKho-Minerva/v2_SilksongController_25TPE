@@ -12,6 +12,8 @@ is_walking = False
 last_step_time = 0
 walking_thread = None
 stop_walking_event = threading.Event()
+# NEW: The core state for our character's direction
+facing_direction = 'right'
 
 # --- Configuration Loading ---
 def load_config():
@@ -70,9 +72,17 @@ def get_key(key_name):
 def walker_thread_func():
     global is_walking
     is_walking = True
-    keyboard.press(get_key(KEY_WALK))
+
+    # Press the key corresponding to the current facing direction
+    if facing_direction == 'right':
+        key_to_press = get_key(KEY_TILT_RIGHT)
+    else:
+        key_to_press = get_key(KEY_TILT_LEFT)
+    keyboard.press(key_to_press)
+
     stop_walking_event.wait()
-    keyboard.release(get_key(KEY_WALK))
+
+    keyboard.release(key_to_press)
     is_walking = False
 
 
@@ -131,23 +141,24 @@ try:
             parsed_json = json.loads(data.decode())
             sensor_type = parsed_json.get("sensor")
 
-            if sensor_type == "rotation_vector":
-                vals = parsed_json["values"]
-                current_roll = quaternion_to_roll(
-                    vals["x"], vals["y"], vals["z"], vals["w"]
-                )
-                # Tilt logic with configurable keys
-                if current_roll > TILT_THRESHOLD_DEGREES:
-                    current_tilt_state = "TILT_RIGHT"
-                    press_tilt_key(get_key(KEY_TILT_RIGHT))
-                elif current_roll < -TILT_THRESHOLD_DEGREES:
-                    current_tilt_state = "TILT_LEFT"
-                    press_tilt_key(get_key(KEY_TILT_LEFT))
-                else:
-                    current_tilt_state = "CENTERED"
-                    release_tilt_key()
+            # TEMPORARILY DISABLED: Tilt-to-strafe logic is replaced by face-and-walk
+            # if sensor_type == "rotation_vector":
+            #     vals = parsed_json["values"]
+            #     current_roll = quaternion_to_roll(
+            #         vals["x"], vals["y"], vals["z"], vals["w"]
+            #     )
+            #     # Tilt logic with configurable keys
+            #     if current_roll > TILT_THRESHOLD_DEGREES:
+            #         current_tilt_state = "TILT_RIGHT"
+            #         press_tilt_key(get_key(KEY_TILT_RIGHT))
+            #     elif current_roll < -TILT_THRESHOLD_DEGREES:
+            #         current_tilt_state = "TILT_LEFT"
+            #         press_tilt_key(get_key(KEY_TILT_LEFT))
+            #     else:
+            #         current_tilt_state = "CENTERED"
+            #         release_tilt_key()
 
-            elif sensor_type == "step_detector":
+            if sensor_type == "step_detector":
                 now = time.time()
                 if now - last_step_time > STEP_DEBOUNCE:
                     last_step_time = now
@@ -184,21 +195,34 @@ try:
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
-            # --- NEW: Turn detection logic ---
+            # --- MODIFIED: Turn detection logic now flips facing_direction ---
             elif sensor_type == 'gyroscope':
                 vals = parsed_json['values']
                 yaw_rate = vals['z']
-                peak_yaw_rate = max(peak_yaw_rate, abs(yaw_rate))  # Track peak for tuning
+                # Track peak for tuning
+                peak_yaw_rate = max(peak_yaw_rate, abs(yaw_rate))
 
                 if abs(yaw_rate) > TURN_THRESHOLD:
-                    print("\n--- TURN DETECTED! ---")
-                    keyboard.press(get_key(KEY_TURN))
-                    time.sleep(0.05)
-                    keyboard.release(get_key(KEY_TURN))
+                    # Flip the direction
+                    if facing_direction == 'right':
+                        facing_direction = 'left'
+                    else:
+                        facing_direction = 'right'
+                    print(f"\n--- TURN DETECTED! Now facing "
+                          f"{facing_direction.upper()} ---")
+                    # Add a small cooldown to prevent multiple flips
+                    time.sleep(0.5)
                     peak_yaw_rate = 0.0  # Reset after action
 
             walk_status = "WALKING" if is_walking else "IDLE"
-            dashboard_string = f"\rT:{current_tilt_state[0]} | W:{walk_status[0]} | Z-A:{peak_z_accel:4.1f} | XY-A:{peak_xy_accel:4.1f} | Yaw:{peak_yaw_rate:3.1f}"
+            # Updated dashboard to show facing direction instead of tilt
+            dashboard_string = (
+                f"\rFacing: {facing_direction.upper().ljust(7)} | "
+                f"Walk: {walk_status.ljust(10)} | "
+                f"Z-A:{peak_z_accel:4.1f} | "
+                f"XY-A:{peak_xy_accel:4.1f} | "
+                f"Yaw:{peak_yaw_rate:3.1f}"
+            )
             print(dashboard_string, end="")
 
         except (json.JSONDecodeError, KeyError) as e:
