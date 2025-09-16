@@ -3,7 +3,7 @@ import json
 import time
 import math
 import threading
-from pynput.keyboard import Controller, Key
+from pynput.keyboard import Controller, Key, Key
 
 # --- Keyboard Control Setup & State ---
 keyboard = Controller()
@@ -21,6 +21,7 @@ WALK_TIMEOUT = 1.5
 STEP_DEBOUNCE = 0.4
 # --- NEW: Separate thresholds for Jump (vertical) and Punch (horizontal) ---
 PUNCH_THRESHOLD = 16.0  # m/s^2 on the X/Y plane
+JUMP_THRESHOLD = 15.0  # m/s^2 on the Z axis
 JUMP_THRESHOLD = 15.0  # m/s^2 on the Z axis
 
 
@@ -86,12 +87,29 @@ try:
             sensor_type = parsed_json.get("sensor")
 
             if sensor_type == "rotation_vector":
-                # ... Tilt logic is unchanged ...
-                pass
+                vals = parsed_json["values"]
+                current_roll = quaternion_to_roll(
+                    vals["x"], vals["y"], vals["z"], vals["w"]
+                )
+                # Tilt logic remains the same...
+                if current_roll > TILT_THRESHOLD_DEGREES:
+                    current_tilt_state = "TILT_RIGHT"
+                    press_tilt_key("d")
+                elif current_roll < -TILT_THRESHOLD_DEGREES:
+                    current_tilt_state = "TILT_LEFT"
+                    press_tilt_key("a")
+                else:
+                    current_tilt_state = "CENTERED"
+                    release_tilt_key()
 
             elif sensor_type == "step_detector":
-                # ... Step logic is unchanged ...
-                pass
+                now = time.time()
+                if now - last_step_time > STEP_DEBOUNCE:
+                    last_step_time = now
+                    if not is_walking and walking_thread is None:
+                        stop_walking_event.clear()
+                        walking_thread = threading.Thread(target=walker_thread_func)
+                        walking_thread.start()
 
             # --- REFACTORED: Acceleration logic now handles two actions ---
             elif sensor_type == "linear_acceleration":
