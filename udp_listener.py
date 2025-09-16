@@ -22,7 +22,8 @@ STEP_DEBOUNCE = 0.4
 # --- NEW: Separate thresholds for Jump (vertical) and Punch (horizontal) ---
 PUNCH_THRESHOLD = 16.0  # m/s^2 on the X/Y plane
 JUMP_THRESHOLD = 15.0  # m/s^2 on the Z axis
-JUMP_THRESHOLD = 15.0  # m/s^2 on the Z axis
+# --- NEW: Threshold for turning (in rad/s). A quick wrist twist is ~4-5.
+TURN_THRESHOLD = 4.5
 
 
 # --- Walker Thread (No changes here) ---
@@ -63,7 +64,7 @@ def quaternion_to_roll(x, y, z, w):
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((LISTEN_IP, LISTEN_PORT))
 
-print(f"--- Silksong Controller v0.5 ---")
+print(f"--- Silksong Controller v0.6 ---")
 print(f"Listening on {LISTEN_IP}:{LISTEN_PORT}")
 print("---------------------------------------")
 
@@ -72,6 +73,7 @@ current_tilt_state = "CENTERED"
 # --- NEW: Separate peak accel trackers for tuning ---
 peak_z_accel = 0.0
 peak_xy_accel = 0.0
+peak_yaw_rate = 0.0  # NEW: for tuning the turn
 
 try:
     while True:
@@ -139,8 +141,21 @@ try:
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
+            # --- NEW: Turn detection logic ---
+            elif sensor_type == 'gyroscope':
+                vals = parsed_json['values']
+                yaw_rate = vals['z']
+                peak_yaw_rate = max(peak_yaw_rate, abs(yaw_rate))  # Track peak for tuning
+
+                if abs(yaw_rate) > TURN_THRESHOLD:
+                    print("\n--- TURN DETECTED! ---")
+                    keyboard.press('i')  # Using 'i' for isolated testing
+                    time.sleep(0.05)
+                    keyboard.release('i')
+                    peak_yaw_rate = 0.0  # Reset after action
+
             walk_status = "WALKING" if is_walking else "IDLE"
-            dashboard_string = f"\rT:{current_tilt_state[0]} | W:{walk_status[0]} | Z-Accel:{peak_z_accel:4.1f} | XY-Accel:{peak_xy_accel:4.1f}"
+            dashboard_string = f"\rT:{current_tilt_state[0]} | W:{walk_status[0]} | Z-A:{peak_z_accel:4.1f} | XY-A:{peak_xy_accel:4.1f} | Yaw:{peak_yaw_rate:3.1f}"
             print(dashboard_string, end="")
 
         except (json.JSONDecodeError, KeyError) as e:

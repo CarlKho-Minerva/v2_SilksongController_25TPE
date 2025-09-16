@@ -27,12 +27,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var stepDetectorSensor: Sensor? = null
     // --- NEW: Add a property for the Linear Acceleration Sensor ---
     private var linearAccelerationSensor: Sensor? = null
+    // --- NEW: Add a property for the Gyroscope Sensor ---
+    private var gyroscopeSensor: Sensor? = null
 
     // --- NEW: Views for status feedback ---
     private lateinit var rotationStatusView: TextView
     private lateinit var stepStatusView: TextView
     // --- NEW: UI View for the new sensor ---
     private lateinit var accelStatusView: TextView
+    // --- NEW: UI View for the gyroscope sensor ---
+    private lateinit var gyroStatusView: TextView
 
     private val MAC_IP_ADDRESS = "192.168.10.234"
     private val UDP_PORT = 12345
@@ -49,6 +53,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         stepStatusView = findViewById(R.id.tv_status_step)
         // --- NEW: Initialize the new TextView ---
         accelStatusView = findViewById(R.id.tv_status_accel)
+        gyroStatusView = findViewById(R.id.tv_status_gyro) // Initialize the new TextView
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
@@ -57,6 +62,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
         // --- NEW: Initialize the Linear Acceleration sensor ---
         linearAccelerationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
+        gyroscopeSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) // Initialize the new sensor
 
         updateSensorStatusUI()
 
@@ -100,6 +106,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private fun updateSensorStatusUI() {
         rotationStatusView.text = if (rotationVectorSensor != null) "Rotation Vector: Ready" else "Rotation Vector: NOT AVAILABLE"
         accelStatusView.text = if (linearAccelerationSensor != null) "Linear Accel: Ready" else "Linear Accel: NOT AVAILABLE"
+        gyroStatusView.text = if (gyroscopeSensor != null) "Gyroscope: Ready" else "Gyroscope: NOT AVAILABLE" // Update status for new sensor
 
         val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
         stepStatusView.text = when {
@@ -113,6 +120,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         // --- MODIFIED: Register all sensors including the new linear acceleration sensor ---
         sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME)
         sensorManager.registerListener(this, linearAccelerationSensor, SensorManager.SENSOR_DELAY_GAME)
+        sensorManager.registerListener(this, gyroscopeSensor, SensorManager.SENSOR_DELAY_GAME) // Register the new sensor
 
         // Only register the step detector if we have permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
@@ -145,6 +153,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             Sensor.TYPE_LINEAR_ACCELERATION -> {
                 val values = event.values
                 val jsonPayload = """{"sensor": "linear_acceleration", "timestamp_ns": ${event.timestamp}, "values": {"x": ${values[0]}, "y": ${values[1]}, "z": ${values[2]}}}"""
+                sendData(jsonPayload)
+            }
+            // --- NEW: Handle events from the Gyroscope ---
+            Sensor.TYPE_GYROSCOPE -> {
+                val values = event.values
+                val jsonPayload = """{"sensor": "gyroscope", "timestamp_ns": ${event.timestamp}, "values": {"x": ${values[0]}, "y": ${values[1]}, "z": ${values[2]}}}"""
                 sendData(jsonPayload)
             }
         }
