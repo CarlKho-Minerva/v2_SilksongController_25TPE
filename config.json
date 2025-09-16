@@ -1,0 +1,22 @@
+{
+    "network": {
+        "listen_ip": "192.168.10.234",
+        "listen_port": 12345
+    },
+    "thresholds": {
+        "tilt_threshold_degrees": 20.0,
+        "walk_timeout_sec": 1.5,
+        "step_debounce_sec": 0.4,
+        "punch_threshold_xy_accel": 16.0,
+        "jump_threshold_z_accel": 15.0,
+        "turn_threshold_yaw_rate": 4.5
+    },
+    "keyboard_mappings": {
+        "walk_forward": "w",
+        "tilt_left": "a",
+        "tilt_right": "d",
+        "jump": "space",
+        "punch": "j",
+        "turn": "i"
+    }
+}

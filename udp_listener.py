@@ -3,9 +3,9 @@ import json
 import time
 import math
 import threading
-from pynput.keyboard import Controller, Key, Key
+from pynput.keyboard import Controller, Key
 
-# --- Keyboard Control Setup & State ---
+# --- Global State ---
 keyboard = Controller()
 current_tilt_key = None
 is_walking = False
@@ -13,26 +13,66 @@ last_step_time = 0
 walking_thread = None
 stop_walking_event = threading.Event()
 
-# --- Configuration ---
-LISTEN_IP = "192.168.10.234"
-LISTEN_PORT = 12345
-TILT_THRESHOLD_DEGREES = 20.0
-WALK_TIMEOUT = 1.5
-STEP_DEBOUNCE = 0.4
-# --- NEW: Separate thresholds for Jump (vertical) and Punch (horizontal) ---
-PUNCH_THRESHOLD = 16.0  # m/s^2 on the X/Y plane
-JUMP_THRESHOLD = 15.0  # m/s^2 on the Z axis
-# --- NEW: Threshold for turning (in rad/s). A quick wrist twist is ~4-5.
-TURN_THRESHOLD = 4.5
+# --- Configuration Loading ---
+def load_config():
+    """Load configuration from config.json file"""
+    try:
+        with open('config.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("ERROR: config.json not found! Please create the configuration file.")
+        exit(1)
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Invalid JSON in config.json: {e}")
+        exit(1)
+
+# Load configuration at startup
+config = load_config()
+
+# Extract configuration values
+LISTEN_IP = config['network']['listen_ip']
+LISTEN_PORT = config['network']['listen_port']
+TILT_THRESHOLD_DEGREES = config['thresholds']['tilt_threshold_degrees']
+WALK_TIMEOUT = config['thresholds']['walk_timeout_sec']
+STEP_DEBOUNCE = config['thresholds']['step_debounce_sec']
+PUNCH_THRESHOLD = config['thresholds']['punch_threshold_xy_accel']
+JUMP_THRESHOLD = config['thresholds']['jump_threshold_z_accel']
+TURN_THRESHOLD = config['thresholds']['turn_threshold_yaw_rate']
+
+# Extract keyboard mappings
+KEY_WALK = config['keyboard_mappings']['walk_forward']
+KEY_TILT_LEFT = config['keyboard_mappings']['tilt_left']
+KEY_TILT_RIGHT = config['keyboard_mappings']['tilt_right']
+KEY_JUMP = config['keyboard_mappings']['jump']
+KEY_PUNCH = config['keyboard_mappings']['punch']
+KEY_TURN = config['keyboard_mappings']['turn']
+
+# Helper function to get the correct key object
+def get_key(key_name):
+    """Convert key name to appropriate key object for pynput"""
+    if key_name == "space":
+        return Key.space
+    elif key_name == "enter":
+        return Key.enter
+    elif key_name == "tab":
+        return Key.tab
+    elif key_name == "shift":
+        return Key.shift
+    elif key_name == "ctrl":
+        return Key.ctrl
+    elif key_name == "alt":
+        return Key.alt
+    else:
+        return key_name  # Regular character keys
 
 
-# --- Walker Thread (No changes here) ---
+# --- Walker Thread ---
 def walker_thread_func():
     global is_walking
     is_walking = True
-    keyboard.press("w")
+    keyboard.press(get_key(KEY_WALK))
     stop_walking_event.wait()
-    keyboard.release("w")
+    keyboard.release(get_key(KEY_WALK))
     is_walking = False
 
 
@@ -64,8 +104,11 @@ def quaternion_to_roll(x, y, z, w):
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((LISTEN_IP, LISTEN_PORT))
 
-print(f"--- Silksong Controller v0.6 ---")
+print("--- Silksong Controller v0.7 (Configurable) ---")
 print(f"Listening on {LISTEN_IP}:{LISTEN_PORT}")
+print("Keyboard mappings loaded from config.json:")
+print(f"  Walk: {KEY_WALK} | Tilt L/R: {KEY_TILT_LEFT}/{KEY_TILT_RIGHT}")
+print(f"  Jump: {KEY_JUMP} | Punch: {KEY_PUNCH} | Turn: {KEY_TURN}")
 print("---------------------------------------")
 
 current_roll = 0.0
@@ -93,13 +136,13 @@ try:
                 current_roll = quaternion_to_roll(
                     vals["x"], vals["y"], vals["z"], vals["w"]
                 )
-                # Tilt logic remains the same...
+                # Tilt logic with configurable keys
                 if current_roll > TILT_THRESHOLD_DEGREES:
                     current_tilt_state = "TILT_RIGHT"
-                    press_tilt_key("d")
+                    press_tilt_key(get_key(KEY_TILT_RIGHT))
                 elif current_roll < -TILT_THRESHOLD_DEGREES:
                     current_tilt_state = "TILT_LEFT"
-                    press_tilt_key("a")
+                    press_tilt_key(get_key(KEY_TILT_LEFT))
                 else:
                     current_tilt_state = "CENTERED"
                     release_tilt_key()
@@ -126,18 +169,18 @@ try:
                 # Check for JUMP first (strong upward motion)
                 if z > JUMP_THRESHOLD:
                     print("\n--- JUMP DETECTED! ---")
-                    keyboard.press(Key.space)
+                    keyboard.press(get_key(KEY_JUMP))
                     time.sleep(0.1)
-                    keyboard.release(Key.space)
+                    keyboard.release(get_key(KEY_JUMP))
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
                 # If not a jump, check for a PUNCH (strong horizontal motion)
                 elif xy_magnitude > PUNCH_THRESHOLD:
                     print("\n--- PUNCH DETECTED! ---")
-                    keyboard.press("j")
+                    keyboard.press(get_key(KEY_PUNCH))
                     time.sleep(0.1)
-                    keyboard.release("j")
+                    keyboard.release(get_key(KEY_PUNCH))
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
@@ -149,9 +192,9 @@ try:
 
                 if abs(yaw_rate) > TURN_THRESHOLD:
                     print("\n--- TURN DETECTED! ---")
-                    keyboard.press('i')  # Using 'i' for isolated testing
+                    keyboard.press(get_key(KEY_TURN))
                     time.sleep(0.05)
-                    keyboard.release('i')
+                    keyboard.release(get_key(KEY_TURN))
                     peak_yaw_rate = 0.0  # Reset after action
 
             walk_status = "WALKING" if is_walking else "IDLE"
