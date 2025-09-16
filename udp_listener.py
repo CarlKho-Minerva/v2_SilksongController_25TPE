@@ -8,45 +8,51 @@ from pynput.keyboard import Controller, Key
 
 # --- Global State ---
 keyboard = Controller()
-current_tilt_key = None
 is_walking = False
 last_step_time = 0
 walking_thread = None
 stop_walking_event = threading.Event()
-# NEW: The core state for our character's direction
-facing_direction = 'right'
-# NEW: A variable to store the phone's current orientation
-last_known_orientation = {'x': 0, 'y': 0, 'z': 0, 'w': 1}  # Initialize to no rotation
+# The core state for our character's direction
+facing_direction = "right"
+# A variable to store the phone's current orientation
+last_known_orientation = {"x": 0, "y": 0, "z": 0, "w": 1}
 
 
 # --- NEW: The core mathematical helper function ---
 def rotate_vector_by_quaternion(vector, quat):
     """Rotates a 3D vector by a quaternion using standard quaternion rotation formula."""
-    q_vec = [quat['x'], quat['y'], quat['z']]
-    q_scalar = quat['w']
-    
+    q_vec = [quat["x"], quat["y"], quat["z"]]
+    q_scalar = quat["w"]
+
     # Standard formula for vector rotation by quaternion
-    a = [2 * (q_vec[1] * vector[2] - q_vec[2] * vector[1]),
-         2 * (q_vec[2] * vector[0] - q_vec[0] * vector[2]),
-         2 * (q_vec[0] * vector[1] - q_vec[1] * vector[0])]
-    
+    a = [
+        2 * (q_vec[1] * vector[2] - q_vec[2] * vector[1]),
+        2 * (q_vec[2] * vector[0] - q_vec[0] * vector[2]),
+        2 * (q_vec[0] * vector[1] - q_vec[1] * vector[0]),
+    ]
+
     b = [q_scalar * a[0], q_scalar * a[1], q_scalar * a[2]]
-    
-    c = [q_vec[1] * a[2] - q_vec[2] * a[1],
-         q_vec[2] * a[0] - q_vec[0] * a[2],
-         q_vec[0] * a[1] - q_vec[1] * a[0]]
-         
-    rotated_vector = [vector[0] + b[0] + c[0],
-                      vector[1] + b[1] + c[1],
-                      vector[2] + b[2] + c[2]]
-                      
+
+    c = [
+        q_vec[1] * a[2] - q_vec[2] * a[1],
+        q_vec[2] * a[0] - q_vec[0] * a[2],
+        q_vec[0] * a[1] - q_vec[1] * a[0],
+    ]
+
+    rotated_vector = [
+        vector[0] + b[0] + c[0],
+        vector[1] + b[1] + c[1],
+        vector[2] + b[2] + c[2],
+    ]
+
     return rotated_vector
+
 
 # --- Configuration Loading ---
 def load_config():
     """Load configuration from config.json file"""
     try:
-        with open('config.json', 'r') as f:
+        with open("config.json", "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         print("ERROR: config.json not found! Please create the configuration file.")
@@ -55,44 +61,35 @@ def load_config():
         print(f"ERROR: Invalid JSON in config.json: {e}")
         exit(1)
 
+
+def get_key(key_string):
+    """Converts a string from config to a pynput Key object if needed."""
+    if key_string.startswith("Key."):
+        key_name = key_string.split(".")[-1]
+        if hasattr(Key, key_name):
+            return getattr(Key, key_name)
+    return key_string
+
+
 # Load configuration at startup
 config = load_config()
 
 # Extract configuration values
-LISTEN_IP = config['network']['listen_ip']
-LISTEN_PORT = config['network']['listen_port']
-TILT_THRESHOLD_DEGREES = config['thresholds']['tilt_threshold_degrees']
-WALK_TIMEOUT = config['thresholds']['walk_timeout_sec']
-STEP_DEBOUNCE = config['thresholds']['step_debounce_sec']
-PUNCH_THRESHOLD = config['thresholds']['punch_threshold_xy_accel']
-JUMP_THRESHOLD = config['thresholds']['jump_threshold_z_accel']
-TURN_THRESHOLD = config['thresholds']['turn_threshold_degrees']
+LISTEN_IP = config["network"]["listen_ip"]
+LISTEN_PORT = config["network"]["listen_port"]
+WALK_TIMEOUT = config["thresholds"]["walk_timeout_sec"]
+STEP_DEBOUNCE = config["thresholds"]["step_debounce_sec"]
+PUNCH_THRESHOLD = config["thresholds"]["punch_threshold_xy_accel"]
+JUMP_THRESHOLD = config["thresholds"]["jump_threshold_z_accel"]
+TURN_THRESHOLD = config["thresholds"]["turn_threshold_degrees"]
 
-# Extract keyboard mappings
-KEY_WALK = config['keyboard_mappings']['walk_forward']
-KEY_TILT_LEFT = config['keyboard_mappings']['tilt_left']
-KEY_TILT_RIGHT = config['keyboard_mappings']['tilt_right']
-KEY_JUMP = config['keyboard_mappings']['jump']
-KEY_PUNCH = config['keyboard_mappings']['punch']
-KEY_TURN = config['keyboard_mappings']['turn']
-
-# Helper function to get the correct key object
-def get_key(key_name):
-    """Convert key name to appropriate key object for pynput"""
-    if key_name == "space":
-        return Key.space
-    elif key_name == "enter":
-        return Key.enter
-    elif key_name == "tab":
-        return Key.tab
-    elif key_name == "shift":
-        return Key.shift
-    elif key_name == "ctrl":
-        return Key.ctrl
-    elif key_name == "alt":
-        return Key.alt
-    else:
-        return key_name  # Regular character keys
+# Load key mappings from config
+KEY_MAP = {
+    "left": get_key(config["keyboard_mappings"]["left"]),
+    "right": get_key(config["keyboard_mappings"]["right"]),
+    "jump": get_key(config["keyboard_mappings"]["jump"]),
+    "attack": get_key(config["keyboard_mappings"]["attack"]),
+}
 
 
 # --- Walker Thread ---
@@ -100,11 +97,8 @@ def walker_thread_func():
     global is_walking
     is_walking = True
 
-    # Press the key corresponding to the current facing direction
-    if facing_direction == 'right':
-        key_to_press = get_key(KEY_TILT_RIGHT)
-    else:
-        key_to_press = get_key(KEY_TILT_LEFT)
+    # Press left or right arrow based on facing direction
+    key_to_press = KEY_MAP["right"] if facing_direction == "right" else KEY_MAP["left"]
     keyboard.press(key_to_press)
 
     stop_walking_event.wait()
@@ -113,23 +107,7 @@ def walker_thread_func():
     is_walking = False
 
 
-# --- Helper Functions (No changes here) ---
-# ... (press_tilt_key, release_tilt_key, quaternion_to_roll) ...
-def press_tilt_key(key):
-    global current_tilt_key
-    if current_tilt_key != key:
-        release_tilt_key()
-        keyboard.press(key)
-        current_tilt_key = key
-
-
-def release_tilt_key():
-    global current_tilt_key
-    if current_tilt_key is not None:
-        keyboard.release(current_tilt_key)
-        current_tilt_key = None
-
-
+# --- Helper Functions ---
 def quaternion_to_roll(qx, qy, qz, qw):
     """Convert quaternion to roll angle in degrees."""
     # Roll (x-axis rotation)
@@ -143,11 +121,15 @@ def quaternion_to_roll(qx, qy, qz, qw):
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((LISTEN_IP, LISTEN_PORT))
 
-print("--- Silksong Controller v0.7 (Configurable) ---")
+print("--- Silksong Controller v1.0 (Final) ---")
 print(f"Listening on {LISTEN_IP}:{LISTEN_PORT}")
-print("Keyboard mappings loaded from config.json:")
-print(f"  Walk: {KEY_WALK} | Tilt L/R: {KEY_TILT_LEFT}/{KEY_TILT_RIGHT}")
-print(f"  Jump: {KEY_JUMP} | Punch: {KEY_PUNCH} | Turn: {KEY_TURN}")
+print("Official Hollow Knight/Silksong key mappings:")
+print(
+    f"  Movement: {config['keyboard_mappings']['left']}/{config['keyboard_mappings']['right']} (direction-based)"
+)
+print(
+    f"  Jump: {config['keyboard_mappings']['jump']} | Attack: {config['keyboard_mappings']['attack']}"
+)
 print("---------------------------------------")
 
 current_roll = 0.0
@@ -178,11 +160,13 @@ try:
             if sensor_type == "rotation_vector":
                 vals = parsed_json["values"]
 
-                # Convert quaternion to azimuth
-                siny_cosp = 2 * (vals['w'] * vals['z'] + vals['x'] * vals['y'])
-                cosy_cosp = 1 - 2 * (vals['y']**2 + vals['z']**2)
-                current_azimuth = math.degrees(
-                    math.atan2(siny_cosp, cosy_cosp))
+                # Store the orientation for world coordinate transformation
+                last_known_orientation.update(vals)
+
+                # Convert quaternion to azimuth for turn detection
+                siny_cosp = 2 * (vals["w"] * vals["z"] + vals["x"] * vals["y"])
+                cosy_cosp = 1 - 2 * (vals["y"] ** 2 + vals["z"] ** 2)
+                current_azimuth = math.degrees(math.atan2(siny_cosp, cosy_cosp))
 
                 # Add current reading to our history
                 azimuth_history.append(current_azimuth)
@@ -196,12 +180,13 @@ try:
                         angle_diff = 360 - angle_diff
 
                     if angle_diff > TURN_THRESHOLD:
-                        print(f"\n--- TURN DETECTED! "
-                              f"({angle_diff:.1f}° change) ---")
-                        if facing_direction == 'right':
-                            facing_direction = 'left'
+                        print(
+                            f"\n--- TURN DETECTED! " f"({angle_diff:.1f}° change) ---"
+                        )
+                        if facing_direction == "right":
+                            facing_direction = "left"
                         else:
-                            facing_direction = 'right'
+                            facing_direction = "right"
                         print(f"Now facing {facing_direction.upper()}")
                         # Clear to prevent multiple triggers
                         azimuth_history.clear()
@@ -212,35 +197,46 @@ try:
                     last_step_time = now
                     if not is_walking and walking_thread is None:
                         stop_walking_event.clear()
-                        walking_thread = threading.Thread(
-                            target=walker_thread_func)
+                        walking_thread = threading.Thread(target=walker_thread_func)
                         walking_thread.start()
 
-            # --- REFACTORED: Acceleration logic now handles two actions ---
+            # --- REFACTORED: Acceleration logic now uses world coordinates ---
             elif sensor_type == "linear_acceleration":
                 vals = parsed_json["values"]
-                x, y, z = vals["x"], vals["y"], vals["z"]
+                accel_vector = [vals["x"], vals["y"], vals["z"]]
 
-                xy_magnitude = math.sqrt(x**2 + y**2)
+                # Perform the transformation to world coordinates
+                world_accel = rotate_vector_by_quaternion(
+                    accel_vector, last_known_orientation
+                )
+                world_x, world_y, world_z = (
+                    world_accel[0],
+                    world_accel[1],
+                    world_accel[2],
+                )
 
-                peak_z_accel = max(peak_z_accel, z)
-                peak_xy_accel = max(peak_xy_accel, xy_magnitude)
+                # In standard East-North-Up frame, XY plane is horizontal, Z is up
+                world_xy_magnitude = math.sqrt(world_x**2 + world_y**2)
 
-                # Check for JUMP first (strong upward motion)
-                if z > JUMP_THRESHOLD:
+                # Update dashboard peaks with world coordinates
+                peak_z_accel = max(peak_z_accel, world_z)
+                peak_xy_accel = max(peak_xy_accel, world_xy_magnitude)
+
+                # Detection logic uses the new world values
+                if world_z > JUMP_THRESHOLD:
                     print("\n--- JUMP DETECTED! ---")
-                    keyboard.press(get_key(KEY_JUMP))
+                    keyboard.press(KEY_MAP["jump"])
                     time.sleep(0.1)
-                    keyboard.release(get_key(KEY_JUMP))
+                    keyboard.release(KEY_MAP["jump"])
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
-                # If not a jump, check for a PUNCH (strong horizontal motion)
-                elif xy_magnitude > PUNCH_THRESHOLD:
-                    print("\n--- PUNCH DETECTED! ---")
-                    keyboard.press(get_key(KEY_PUNCH))
+                # If not a jump, check for an ATTACK (strong horizontal motion)
+                elif world_xy_magnitude > PUNCH_THRESHOLD:
+                    print("\n--- ATTACK DETECTED! ---")
+                    keyboard.press(KEY_MAP["attack"])
                     time.sleep(0.1)
-                    keyboard.release(get_key(KEY_PUNCH))
+                    keyboard.release(KEY_MAP["attack"])
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
@@ -264,12 +260,12 @@ try:
             #         peak_yaw_rate = 0.0  # Reset after action
 
             walk_status = "WALKING" if is_walking else "IDLE"
-            # Updated dashboard to show facing direction instead of tilt
+            # Updated dashboard to show world coordinates instead of device
             dashboard_string = (
                 f"\rFacing: {facing_direction.upper().ljust(7)} | "
                 f"Walk: {walk_status.ljust(10)} | "
-                f"Z-A:{peak_z_accel:4.1f} | "
-                f"XY-A:{peak_xy_accel:4.1f} | "
+                f"World Z-A:{peak_z_accel:4.1f} | "
+                f"World XY-A:{peak_xy_accel:4.1f} | "
                 f"Yaw:{peak_yaw_rate:3.1f}"
             )
             print(dashboard_string, end="")
@@ -285,5 +281,4 @@ finally:
     if is_walking and walking_thread is not None:
         stop_walking_event.set()
         walking_thread.join()
-    release_tilt_key()
     sock.close()

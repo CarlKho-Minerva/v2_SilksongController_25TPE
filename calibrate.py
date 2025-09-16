@@ -5,12 +5,13 @@ import math
 import statistics  # For calculating mean and standard deviation
 import sys  # For command line arguments
 
+
 # --- NEW: A helper function to display instructions clearly ---
 def show_instructions(message):
     """Prints a message and waits for the user to acknowledge."""
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print(message)
-    print("="*50)
+    print("=" * 50)
     input("Press [Enter] when you are ready to continue...")
 
 
@@ -85,20 +86,28 @@ def get_peak_z_accel(sock, duration_sec):
 
 def get_stable_azimuth(sock):
     """Waits for a rotation_vector packet and returns the azimuth."""
-    while True:
+    timeout = 10.0  # 10 second timeout
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
         try:
             data, _ = sock.recvfrom(2048)
             parsed_json = json.loads(data.decode())
-            if parsed_json.get('sensor') == 'rotation_vector':
-                vals = parsed_json['values']
+            if parsed_json.get("sensor") == "rotation_vector":
+                vals = parsed_json["values"]
                 # Convert quaternion to azimuth (yaw)
                 # Yaw (z-axis rotation)
-                siny_cosp = 2 * (vals['w'] * vals['z'] + vals['x'] * vals['y'])
-                cosy_cosp = 1 - 2 * (vals['y']**2 + vals['z']**2)
+                siny_cosp = 2 * (vals["w"] * vals["z"] + vals["x"] * vals["y"])
+                cosy_cosp = 1 - 2 * (vals["y"] ** 2 + vals["z"] ** 2)
                 yaw = math.atan2(siny_cosp, cosy_cosp)
                 return math.degrees(yaw)
         except (BlockingIOError, json.JSONDecodeError, KeyError):
-            pass  # Wait for a valid packet
+            time.sleep(0.01)  # Small delay to prevent busy waiting
+
+    # If we get here, we timed out
+    print("\n  ERROR: No rotation_vector data received!")
+    print("  Make sure your Android app is sending rotation_vector sensor data.")
+    return None
 
 
 def calibrate_punch(config, sock):
@@ -151,7 +160,7 @@ def calibrate_punch(config, sock):
 
     print("\n--- Analysis Complete ---")
     print(f"Average Peak Punch: {avg_peak:.2f} m/s²")
-    prev_threshold = config['thresholds']['punch_threshold_xy_accel']
+    prev_threshold = config["thresholds"]["punch_threshold_xy_accel"]
     print(f"Previous Threshold: {prev_threshold}")
     print(f"New Recommended Threshold: {new_threshold:.2f}")
 
@@ -173,8 +182,10 @@ def calibrate_jump(config, sock):
     num_samples = 3
 
     for i in range(num_samples):
-        prompt = (f"\nPress [Enter] when you are ready for Jump "
-                  f"{i + 1} of {num_samples}...")
+        prompt = (
+            f"\nPress [Enter] when you are ready for Jump "
+            f"{i + 1} of {num_samples}..."
+        )
         input(prompt)
         print("Get ready...")
         time.sleep(1)
@@ -183,8 +194,10 @@ def calibrate_jump(config, sock):
         peak = get_peak_z_accel(sock, 2.0)
 
         if peak < 5.0:
-            print(f"  > Recorded a peak of {peak:.2f} m/s². "
-                  f"That seems low. Please try again with a sharper motion.")
+            print(
+                f"  > Recorded a peak of {peak:.2f} m/s². "
+                f"That seems low. Please try again with a sharper motion."
+            )
             continue
 
         print(f"  > Recorded a peak of {peak:.2f} m/s². Good!")
@@ -192,8 +205,7 @@ def calibrate_jump(config, sock):
 
     # --- Analyze the results ---
     if len(peak_readings) < 2:
-        print("\nNot enough valid samples to calibrate jump. "
-              "Please try again.")
+        print("\nNot enough valid samples to calibrate jump. " "Please try again.")
         return
 
     avg_peak = statistics.mean(peak_readings)
@@ -207,21 +219,22 @@ def calibrate_jump(config, sock):
 
     print("\n--- Jump Analysis Complete ---")
     print(f"Average Peak Jump: {avg_peak:.2f} m/s²")
-    prev_threshold = config['thresholds']['jump_threshold_z_accel']
+    prev_threshold = config["thresholds"]["jump_threshold_z_accel"]
     print(f"Previous Threshold: {prev_threshold}")
     print(f"New Recommended Threshold: {new_threshold:.2f}")
 
     config["thresholds"]["jump_threshold_z_accel"] = new_threshold
 
 
+# --- REWRITTEN: The entire turn calibration function ---
 def calibrate_turn(config, sock):
-    """Guides user through calibrating turn gesture based on azimuth change."""
-
+    """Guides the user through calibrating the turn gesture by measuring max angular change."""
     instruction_message = (
         "--- Calibrating TURN ---\n\n"
-        "Adopt your TRAVEL STANCE.\n"
-        "This is usually by your side, as if you were walking naturally.\n\n"
-        "You will face a direction, press Enter, then turn 180° and press Enter again."
+        "This will measure a full 180-degree body turn.\n\n"
+        "1. Adopt your TRAVEL STANCE (how you hold the phone when walking).\n"
+        "2. When I say 'GO!', you will have 3 seconds to turn around completely.\n"
+        "3. You can turn either left or right, whichever is comfortable."
     )
     show_instructions(instruction_message)
 
@@ -229,41 +242,63 @@ def calibrate_turn(config, sock):
     num_samples = 3
 
     for i in range(num_samples):
-        print(f"\n--- Turn Sample {i + 1} of {num_samples} ---")
-        input("Face your starting direction and press [Enter]...")
-        print("  > Reading starting direction...")
-        start_azimuth = get_stable_azimuth(sock)
-        print(f"  > Start direction captured ({start_azimuth:.1f}°).")
+        input(f"\nPress [Enter] when ready for Turn Sample {i + 1} of {num_samples}...")
 
-        input("Now, turn around completely (180°) and press [Enter]...")
-        print("  > Reading ending direction...")
-        end_azimuth = get_stable_azimuth(sock)
-        print(f"  > End direction captured ({end_azimuth:.1f}°).")
+        # Get a stable starting azimuth before the user moves
+        print("  > Get ready... Don't move.")
+        time.sleep(1)
+        start_azimuth = None
+        while start_azimuth is None:
+            try:
+                data, _ = sock.recvfrom(2048)
+                parsed = json.loads(data.decode())
+                if parsed.get("sensor") == "rotation_vector":
+                    vals = parsed["values"]
+                    siny_cosp = 2 * (vals["w"] * vals["z"] + vals["x"] * vals["y"])
+                    cosy_cosp = 1 - 2 * (vals["y"] ** 2 + vals["z"] ** 2)
+                    start_azimuth = math.degrees(math.atan2(siny_cosp, cosy_cosp))
+            except (BlockingIOError, json.JSONDecodeError, KeyError):
+                pass
+        print(f"  > Starting direction locked ({start_azimuth:.1f}°). GO!")
 
-        # Calculate the shortest angle difference
-        angle_diff = abs(start_azimuth - end_azimuth)
-        if angle_diff > 180:
-            angle_diff = 360 - angle_diff
+        # --- Time-based recording window ---
+        max_turn_diff = 0.0
+        end_time = time.time() + 3.0  # 3 second window to perform the turn
 
-        print(f"  > Calculated turn magnitude: {angle_diff:.1f}°")
-        turn_magnitudes.append(angle_diff)
+        while time.time() < end_time:
+            try:
+                data, _ = sock.recvfrom(2048)
+                parsed = json.loads(data.decode())
+                if parsed.get("sensor") == "rotation_vector":
+                    vals = parsed["values"]
+                    siny_cosp = 2 * (vals["w"] * vals["z"] + vals["x"] * vals["y"])
+                    cosy_cosp = 1 - 2 * (vals["y"] ** 2 + vals["z"] ** 2)
+                    current_azimuth = math.degrees(math.atan2(siny_cosp, cosy_cosp))
 
-    if not turn_magnitudes:
-        print("\nCould not capture any valid turns. Aborting.")
+                    # Calculate shortest angle difference from the start
+                    diff = 180 - abs(abs(start_azimuth - current_azimuth) - 180)
+                    max_turn_diff = max(max_turn_diff, diff)
+
+            except (BlockingIOError, json.JSONDecodeError, KeyError):
+                pass
+
+        print(f"  > Recorded a maximum turn of {max_turn_diff:.1f}°. Good!")
+        turn_magnitudes.append(max_turn_diff)
+
+    if len(turn_magnitudes) < 2:
+        print("\nNot enough valid samples. Aborting turn calibration.")
         return
 
     avg_turn = statistics.mean(turn_magnitudes)
-    # The threshold is a percentage of their average 180-degree turn
-    new_threshold = avg_turn * 0.75  # 75% of their average turn
+    new_threshold = max(
+        avg_turn * 0.75, 90.0
+    )  # Set threshold to 75% of their turn, with a minimum of 90 degrees
 
     print("\n--- Turn Analysis Complete ---")
     print(f"Average Measured Turn: {avg_turn:.1f}°")
     print(f"New Recommended Turn Threshold: {new_threshold:.1f}°")
 
-    # NEW/RENAMED config key for clarity
-    config['thresholds']['turn_threshold_degrees'] = new_threshold
-    # Remove the old, now unused key if it exists
-    config['thresholds'].pop('turn_threshold_yaw_rate', None)
+    config["thresholds"]["turn_threshold_degrees"] = new_threshold
 
 
 def calibrate_walking(config, sock):
@@ -276,32 +311,63 @@ def calibrate_walking(config, sock):
     )
     show_instructions(instruction_message)
     print("Get ready to walk in place at a comfortable, natural pace.")
+    print(f"Listening on {config['network']['listen_ip']}:{config['network']['listen_port']}")
+    print("Make sure your Android app is sending data to this address!")
     time.sleep(1)
     print("GO!")
 
     step_timestamps = []
+    last_step_time = 0  # Track last step for minimal debouncing
+    minimal_debounce = 0.05  # Even smaller debounce (50ms) to capture more steps
     end_time = time.time() + 10.0
+
+    # Debug counters
+    total_packets = 0
+    step_packets = 0
+    other_sensors = {}
 
     while time.time() < end_time:
         remaining = end_time - time.time()
-        print(f"\r  > Recording... {remaining:.1f} seconds remaining.", end="")
+        print(f"\r  > Recording... {remaining:.1f}s remaining. Steps: {len(step_timestamps)}", end="", flush=True)
         try:
             data, _ = sock.recvfrom(2048)
             parsed_json = json.loads(data.decode())
-            if parsed_json.get('sensor') == 'step_detector':
-                step_timestamps.append(time.time())
+            sensor_type = parsed_json.get("sensor")
+            total_packets += 1
+
+            # Count all sensor types for debugging
+            if sensor_type in other_sensors:
+                other_sensors[sensor_type] += 1
+            else:
+                other_sensors[sensor_type] = 1
+
+            if sensor_type == "step_detector":
+                step_packets += 1
+                now = time.time()
+                # Use minimal debouncing to avoid sensor noise but capture natural rhythm
+                if now - last_step_time > minimal_debounce:
+                    step_timestamps.append(now)
+                    last_step_time = now
+                    print(f"\n  > Step {len(step_timestamps)} detected! (Total step packets: {step_packets})")
+                else:
+                    print(f"\n  > Step packet received but debounced ({now - last_step_time:.3f}s since last)")
         except (BlockingIOError, json.JSONDecodeError, KeyError):
             pass
 
     print("\n  > Recording complete!")
+    print(f"  > Debug info: Received {total_packets} total packets")
+    print(f"  > Sensor types received: {other_sensors}")
+    print(f"  > Step detector packets: {step_packets}")
 
     if len(step_timestamps) < 3:
         print("Not enough steps detected to calibrate. Please try again.")
         return
 
     # Calculate intervals between steps
-    intervals = [step_timestamps[i] - step_timestamps[i-1]
-                 for i in range(1, len(step_timestamps))]
+    intervals = [
+        step_timestamps[i] - step_timestamps[i - 1]
+        for i in range(1, len(step_timestamps))
+    ]
 
     avg_interval = statistics.mean(intervals)
 
@@ -311,18 +377,18 @@ def calibrate_walking(config, sock):
     new_timeout = avg_interval * 2.5
 
     print("\n--- Walking Analysis Complete ---")
-    print(f"Detected {len(step_timestamps)} steps with an average time of "
-          f"{avg_interval:.2f}s between steps.")
+    print(
+        f"Detected {len(step_timestamps)} steps with an average time of "
+        f"{avg_interval:.2f}s between steps."
+    )
 
-    prev_debounce = config['thresholds']['step_debounce_sec']
-    prev_timeout = config['thresholds']['walk_timeout_sec']
-    print(f"Previous Debounce: {prev_debounce:.2f}s | "
-          f"New: {new_debounce:.2f}s")
-    print(f"Previous Timeout:  {prev_timeout:.2f}s | "
-          f"New: {new_timeout:.2f}s")
+    prev_debounce = config["thresholds"]["step_debounce_sec"]
+    prev_timeout = config["thresholds"]["walk_timeout_sec"]
+    print(f"Previous Debounce: {prev_debounce:.2f}s | New: {new_debounce:.2f}s")
+    print(f"Previous Timeout:  {prev_timeout:.2f}s | New: {new_timeout:.2f}s")
 
-    config['thresholds']['step_debounce_sec'] = new_debounce
-    config['thresholds']['walk_timeout_sec'] = new_timeout
+    config["thresholds"]["step_debounce_sec"] = new_debounce
+    config["thresholds"]["walk_timeout_sec"] = new_timeout
 
 
 def main():
@@ -331,14 +397,26 @@ def main():
 
     # Set up the socket once for all calibrations
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((config['network']['listen_ip'],
-               config['network']['listen_port']))
-    sock.setblocking(False)
+    try:
+        sock.bind((config["network"]["listen_ip"], config["network"]["listen_port"]))
+        sock.setblocking(False)
+    except OSError:
+        print("\n" + "="*60)
+        print("ERROR: Could not bind to the UDP port!")
+        print("="*60)
+        print(f"Port {config['network']['listen_port']} is likely already in use.")
+        print("This usually happens when udp_listener.py is still running.")
+        print("\nTo fix this:")
+        print("1. Stop udp_listener.py (press Ctrl+C in its terminal)")
+        print("2. Then run calibration again")
+        print("3. After calibration, restart udp_listener.py")
+        print("="*60)
+        sock.close()
+        return
 
-
-    print("="*50)
+    print("=" * 50)
     print(" Welcome to the Silksong Controller Calibrator")
-    print("="*50)
+    print("=" * 50)
     print("\nThis tool will personalize the controller to your unique movements.")
     print("Please follow the on-screen instructions carefully.")
 
@@ -347,13 +425,13 @@ def main():
         gesture = sys.argv[1].lower()
         print(f"Calibrating specific gesture: {gesture}")
 
-        if gesture == 'punch':
+        if gesture == "punch":
             calibrate_punch(config, sock)
-        elif gesture == 'jump':
+        elif gesture == "jump":
             calibrate_jump(config, sock)
-        elif gesture == 'turn':
+        elif gesture == "turn":
             calibrate_turn(config, sock)
-        elif gesture == 'walking':
+        elif gesture == "walking":
             calibrate_walking(config, sock)
         else:
             print(f"Unknown gesture: {gesture}")
@@ -366,7 +444,6 @@ def main():
         calibrate_jump(config, sock)
         calibrate_walking(config, sock)
         calibrate_turn(config, sock)
-
 
     sock.close()  # Clean up the socket
     print("\n--- Calibration Complete! ---")
