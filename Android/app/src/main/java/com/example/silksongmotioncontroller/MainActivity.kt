@@ -6,6 +6,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -117,6 +118,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun startStreaming() {
+        // --- NEW: Add this line to keep the screen on ---
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         // --- MODIFIED: Register all sensors including the new linear acceleration sensor ---
         sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME)
         sensorManager.registerListener(this, linearAccelerationSensor, SensorManager.SENSOR_DELAY_GAME)
@@ -132,6 +136,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     // The rest of the file remains largely the same
     private fun stopStreaming() {
+        // --- NEW: Add this line to allow the screen to sleep again ---
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         sensorManager.unregisterListener(this)
         Toast.makeText(this, "Streaming OFF", Toast.LENGTH_SHORT).show()
     }

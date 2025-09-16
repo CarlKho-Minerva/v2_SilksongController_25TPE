@@ -231,10 +231,10 @@ def calibrate_turn(config, sock):
     """Guides the user through calibrating the turn gesture by measuring max angular change."""
     instruction_message = (
         "--- Calibrating TURN ---\n\n"
-        "This will measure a full 180-degree body turn.\n\n"
-        "1. Adopt your TRAVEL STANCE (how you hold the phone when walking).\n"
-        "2. When I say 'GO!', you will have 3 seconds to turn around completely.\n"
-        "3. You can turn either left or right, whichever is comfortable."
+        "This will measure a turn during movement to ensure reliability.\n\n"
+        "1. Adopt your TRAVEL STANCE.\n"
+        "2. When I say 'GO!', begin WALKING IN PLACE.\n"
+        "3. While walking in place, perform a full 180° body turn."
     )
     show_instructions(instruction_message)
 
@@ -376,45 +376,23 @@ def calibrate_walking(config, sock):
 
     avg_interval = statistics.mean(intervals)
 
-    # NEW FUEL MODEL CALCULATIONS:
-    # Each step gives you fuel for longer than your natural step interval
-    # This creates a comfortable buffer for natural rhythm variations
-    fuel_added_per_step = avg_interval * 2.0  # Each step gives 2x your natural interval
+    # --- NEW: Convert timeout/debounce to the "Walk Fuel" model parameters ---
+    # Each step adds a bit more than one step's worth of time to the tank.
+    new_fuel_per_step = avg_interval * 1.25
+    # The max capacity of the tank is about 3 steps worth of time.
+    new_max_fuel = avg_interval * 3.0
 
-    # Maximum fuel capacity prevents infinite accumulation but allows for bursts
-    max_fuel_capacity = avg_interval * 3.0  # Tank can hold 3x your natural interval
+    print("\n--- Walking Analysis Complete ---")
+    print(f"Detected {len(step_timestamps)} steps with an average time of {avg_interval:.2f}s between steps.")
+    print(f"New Fuel Per Step: {new_fuel_per_step:.2f}s")
+    print(f"New Max Fuel Capacity: {new_max_fuel:.2f}s")
 
-    # Alternative: if you want to be more conservative, use smaller multipliers:
-    # fuel_added_per_step = avg_interval * 1.5
-    # max_fuel_capacity = avg_interval * 2.5
-
-    print("\n--- Walking Fuel Analysis Complete ---")
-    print(
-        f"Detected {len(step_timestamps)} steps with an average time of "
-        f"{avg_interval:.2f}s between steps."
-    )
-    print(f"\nNew Fuel System Parameters:")
-    print(f"  Fuel added per step: {fuel_added_per_step:.2f}s")
-    print(f"  Maximum fuel capacity: {max_fuel_capacity:.2f}s")
-    print(f"\nThis means:")
-    print(f"  - Each step gives you {fuel_added_per_step:.1f}s of walking time")
-    print(f"  - You can accumulate up to {max_fuel_capacity:.1f}s of fuel")
-    print(f"  - Natural rhythm variations will feel smooth and fluid")
-
-    # Update config with new fuel parameters
-    config["thresholds"]["fuel_added_per_step_sec"] = fuel_added_per_step
-    config["thresholds"]["max_fuel_sec"] = max_fuel_capacity
-
-    # Show comparison with old system if it existed
-    try:
-        if "step_debounce_sec" in config["thresholds"]:
-            prev_debounce = config["thresholds"]["step_debounce_sec"]
-            prev_timeout = config["thresholds"]["walk_timeout_sec"]
-            print(f"\nReplaced old system:")
-            print(f"  Old Debounce: {prev_debounce:.2f}s -> New Fuel System (no hard debounce)")
-            print(f"  Old Timeout:  {prev_timeout:.2f}s -> New Fuel System (gradual depletion)")
-    except KeyError:
-        pass
+    # Save the new fuel-based parameters
+    config['thresholds']['fuel_added_per_step_sec'] = new_fuel_per_step
+    config['thresholds']['max_fuel_sec'] = new_max_fuel
+    # Remove the old keys if they still exist
+    config['thresholds'].pop('walk_timeout_sec', None)
+    config['thresholds'].pop('step_debounce_sec', None)
 
 
 def main():
