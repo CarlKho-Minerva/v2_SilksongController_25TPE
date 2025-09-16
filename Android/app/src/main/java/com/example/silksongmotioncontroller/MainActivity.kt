@@ -1,5 +1,7 @@
 package com.example.silksongmotioncontroller
 
+import android.Manifest // NEW: Import for permissions
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -7,9 +9,10 @@ import android.hardware.SensorManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import android.widget.Switch
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,73 +24,117 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var rotationVectorSensor: Sensor? = null
+    private var stepDetectorSensor: Sensor? = null
 
-    private val MAC_IP_ADDRESS = "192.168.10.234" // CHANGE THIS
+    // --- NEW: Views for status feedback ---
+    private lateinit var rotationStatusView: TextView
+    private lateinit var stepStatusView: TextView
+
+    private val MAC_IP_ADDRESS = "192.168.10.234"
     private val UDP_PORT = 12345
+
+    // --- NEW: Constant for the permission request ---
+    private val ACTIVITY_RECOGNITION_REQUEST_CODE = 100
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val streamSwitch: SwitchCompat = findViewById(R.id.switch_stream)
+        rotationStatusView = findViewById(R.id.tv_status_rotation) // Assuming you added this
+        stepStatusView = findViewById(R.id.tv_status_step)
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+
+        // Initialize sensors, but don't use them yet
         rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
-        if (rotationVectorSensor == null) {
-            Toast.makeText(this, "Rotation Vector Sensor not available!", Toast.LENGTH_LONG).show()
-            streamSwitch.isEnabled = false
-        }
+        updateSensorStatusUI()
 
-        // --- MODIFIED: Logic is now tied to the switch's state change ---
         streamSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                // When switch is ON, start listening to the sensor
-                startStreaming()
+                // --- MODIFIED: Check permissions before starting ---
+                checkPermissionAndStartStreaming()
             } else {
-                // When switch is OFF, stop listening
                 stopStreaming()
             }
         }
     }
 
-    private fun startStreaming() {
-        // [Citation: https://developer.android.com/develop/sensors-and-location/sensors/sensors_overview#monitoring]
-        rotationVectorSensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
-            Toast.makeText(this, "Streaming ON", Toast.LENGTH_SHORT).show()
+    private fun checkPermissionAndStartStreaming() {
+        // [Citation: https://developer.android.com/training/permissions/requesting]
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
+            // Permission is already granted, start streaming
+            startStreaming()
+        } else {
+            // Permission is not granted, request it from the user
+            requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), ACTIVITY_RECOGNITION_REQUEST_CODE)
         }
     }
 
+    // --- NEW: This function handles the result of the permission request ---
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == ACTIVITY_RECOGNITION_REQUEST_CODE) {
+            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                // Permission was granted, now we can start streaming
+                startStreaming()
+            } else {
+                // Permission was denied. Inform the user and disable the switch.
+                Toast.makeText(this, "Permission denied. Step Detector will not work.", Toast.LENGTH_LONG).show()
+                findViewById<SwitchCompat>(R.id.switch_stream).isChecked = false
+                updateSensorStatusUI()
+            }
+        }
+    }
+
+    private fun updateSensorStatusUI() {
+        rotationStatusView.text = if (rotationVectorSensor != null) "Rotation Vector: Ready" else "Rotation Vector: NOT AVAILABLE"
+
+        val hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+        stepStatusView.text = when {
+            stepDetectorSensor == null -> "Step Detector: NOT AVAILABLE"
+            !hasPermission -> "Step Detector: PERMISSION NEEDED"
+            else -> "Step Detector: Ready"
+        }
+    }
+
+    private fun startStreaming() {
+        sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME)
+
+        // Only register the step detector if we have permission
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
+            sensorManager.registerListener(this, stepDetectorSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+
+        Toast.makeText(this, "Streaming ON", Toast.LENGTH_SHORT).show()
+    }
+
+    // The rest of the file remains largely the same
     private fun stopStreaming() {
-        // [Citation: https://developer.android.com/develop/sensors-and-location/sensors/sensors_overview#best-practices]
         sensorManager.unregisterListener(this)
         Toast.makeText(this, "Streaming OFF", Toast.LENGTH_SHORT).show()
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
-    // --- MODIFIED: This now sends data for EVERY event, without unregistering ---
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
-            val values = event.values
-            val jsonPayload = """
-                {
-                    "sensor": "rotation_vector",
-                    "timestamp_ns": ${event.timestamp},
-                    "values": {
-                        "x": ${values[0]},
-                        "y": ${values[1]},
-                        "z": ${values[2]},
-                        "w": ${values.getOrNull(3) ?: 0.0}
-                    }
-                }
-            """.trimIndent()
-
-            lifecycleScope.launch(Dispatchers.IO) {
-                sendUdpMessage(jsonPayload)
+        when (event?.sensor?.type) {
+            Sensor.TYPE_ROTATION_VECTOR -> {
+                val values = event.values
+                val jsonPayload = """{"sensor": "rotation_vector", "timestamp_ns": ${event.timestamp}, "values": {"x": ${values[0]}, "y": ${values[1]}, "z": ${values[2]}, "w": ${values.getOrNull(3) ?: 0.0}}}"""
+                sendData(jsonPayload)
+            }
+            Sensor.TYPE_STEP_DETECTOR -> {
+                val jsonPayload = """{"sensor": "step_detector", "timestamp_ns": ${event.timestamp}}"""
+                sendData(jsonPayload)
             }
         }
+    }
+
+    private fun sendData(jsonPayload: String) {
+        lifecycleScope.launch(Dispatchers.IO) { sendUdpMessage(jsonPayload) }
     }
 
     private fun sendUdpMessage(message: String) {
@@ -103,7 +150,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    // Ensure we stop streaming if the app is paused
     override fun onPause() {
         super.onPause()
         stopStreaming()
