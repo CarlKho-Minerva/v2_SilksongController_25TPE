@@ -7,7 +7,7 @@
         "tilt_threshold_degrees": 20.0,
         "walk_timeout_sec": 1.5,
         "step_debounce_sec": 0.4,
-        "punch_threshold_xy_accel": 16.0,
+        "punch_threshold_xy_accel": 10.71468557675238,
         "jump_threshold_z_accel": 15.0,
         "turn_threshold_yaw_rate": 4.5
     },
