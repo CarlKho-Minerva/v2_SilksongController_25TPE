@@ -5,11 +5,11 @@
     },
     "thresholds": {
         "tilt_threshold_degrees": 20.0,
-        "walk_timeout_sec": 1.5,
-        "step_debounce_sec": 0.4,
-        "punch_threshold_xy_accel": 8.0,
-        "jump_threshold_z_accel": 8.0,
-        "turn_threshold_yaw_rate": 4.5
+        "walk_timeout_sec": 1.4464719593524933,
+        "step_debounce_sec": 0.433941587805748,
+        "punch_threshold_xy_accel": 10.63058174702908,
+        "jump_threshold_z_accel": 16.892739571275037,
+        "turn_threshold_degrees": 20
     },
     "keyboard_mappings": {
         "walk_forward": "w",

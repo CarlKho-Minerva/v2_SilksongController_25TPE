@@ -3,6 +3,7 @@ import json
 import time
 import math
 import threading
+from collections import deque
 from pynput.keyboard import Controller, Key
 
 # --- Global State ---
@@ -39,7 +40,7 @@ WALK_TIMEOUT = config['thresholds']['walk_timeout_sec']
 STEP_DEBOUNCE = config['thresholds']['step_debounce_sec']
 PUNCH_THRESHOLD = config['thresholds']['punch_threshold_xy_accel']
 JUMP_THRESHOLD = config['thresholds']['jump_threshold_z_accel']
-TURN_THRESHOLD = config['thresholds']['turn_threshold_yaw_rate']
+TURN_THRESHOLD = config['thresholds']['turn_threshold_degrees']
 
 # Extract keyboard mappings
 KEY_WALK = config['keyboard_mappings']['walk_forward']
@@ -103,9 +104,11 @@ def release_tilt_key():
         current_tilt_key = None
 
 
-def quaternion_to_roll(x, y, z, w):
-    sinr_cosp = 2 * (w * x + y * z)
-    cosr_cosp = 1 - 2 * (x * x + y * y)
+def quaternion_to_roll(qx, qy, qz, qw):
+    """Convert quaternion to roll angle in degrees."""
+    # Roll (x-axis rotation)
+    sinr_cosp = 2 * (qw * qx + qy * qz)
+    cosr_cosp = 1 - 2 * (qx * qx + qy * qy)
     roll = math.atan2(sinr_cosp, cosr_cosp)
     return math.degrees(roll)
 
@@ -127,6 +130,9 @@ current_tilt_state = "CENTERED"
 peak_z_accel = 0.0
 peak_xy_accel = 0.0
 peak_yaw_rate = 0.0  # NEW: for tuning the turn
+# NEW: A buffer to store recent azimuth history for turn detection
+# We'll store ~0.5 seconds of data (at 50Hz, that's 25 samples)
+azimuth_history = deque(maxlen=25)
 
 try:
     while True:
@@ -134,37 +140,54 @@ try:
 
         if is_walking and time.time() - last_step_time > WALK_TIMEOUT:
             stop_walking_event.set()
-            walking_thread.join()
-            walking_thread = None
+            if walking_thread is not None:
+                walking_thread.join()
+                walking_thread = None
 
         try:
             parsed_json = json.loads(data.decode())
             sensor_type = parsed_json.get("sensor")
 
-            # TEMPORARILY DISABLED: Tilt-to-strafe logic is replaced by face-and-walk
-            # if sensor_type == "rotation_vector":
-            #     vals = parsed_json["values"]
-            #     current_roll = quaternion_to_roll(
-            #         vals["x"], vals["y"], vals["z"], vals["w"]
-            #     )
-            #     # Tilt logic with configurable keys
-            #     if current_roll > TILT_THRESHOLD_DEGREES:
-            #         current_tilt_state = "TILT_RIGHT"
-            #         press_tilt_key(get_key(KEY_TILT_RIGHT))
-            #     elif current_roll < -TILT_THRESHOLD_DEGREES:
-            #         current_tilt_state = "TILT_LEFT"
-            #         press_tilt_key(get_key(KEY_TILT_LEFT))
-            #     else:
-            #         current_tilt_state = "CENTERED"
-            #         release_tilt_key()
+            # NEW: Rotation vector now used for turn detection via azimuth
+            if sensor_type == "rotation_vector":
+                vals = parsed_json["values"]
 
-            if sensor_type == "step_detector":
+                # Convert quaternion to azimuth
+                siny_cosp = 2 * (vals['w'] * vals['z'] + vals['x'] * vals['y'])
+                cosy_cosp = 1 - 2 * (vals['y']**2 + vals['z']**2)
+                current_azimuth = math.degrees(
+                    math.atan2(siny_cosp, cosy_cosp))
+
+                # Add current reading to our history
+                azimuth_history.append(current_azimuth)
+
+                # Check for a turn only if our history buffer is full
+                if len(azimuth_history) == azimuth_history.maxlen:
+                    oldest_azimuth = azimuth_history[0]
+                    # Calculate the shortest angle difference
+                    angle_diff = abs(current_azimuth - oldest_azimuth)
+                    if angle_diff > 180:
+                        angle_diff = 360 - angle_diff
+
+                    if angle_diff > TURN_THRESHOLD:
+                        print(f"\n--- TURN DETECTED! "
+                              f"({angle_diff:.1f}° change) ---")
+                        if facing_direction == 'right':
+                            facing_direction = 'left'
+                        else:
+                            facing_direction = 'right'
+                        print(f"Now facing {facing_direction.upper()}")
+                        # Clear to prevent multiple triggers
+                        azimuth_history.clear()
+
+            elif sensor_type == "step_detector":
                 now = time.time()
                 if now - last_step_time > STEP_DEBOUNCE:
                     last_step_time = now
                     if not is_walking and walking_thread is None:
                         stop_walking_event.clear()
-                        walking_thread = threading.Thread(target=walker_thread_func)
+                        walking_thread = threading.Thread(
+                            target=walker_thread_func)
                         walking_thread.start()
 
             # --- REFACTORED: Acceleration logic now handles two actions ---
@@ -195,24 +218,24 @@ try:
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
-            # --- MODIFIED: Turn detection logic now flips facing_direction ---
-            elif sensor_type == 'gyroscope':
-                vals = parsed_json['values']
-                yaw_rate = vals['z']
-                # Track peak for tuning
-                peak_yaw_rate = max(peak_yaw_rate, abs(yaw_rate))
-
-                if abs(yaw_rate) > TURN_THRESHOLD:
-                    # Flip the direction
-                    if facing_direction == 'right':
-                        facing_direction = 'left'
-                    else:
-                        facing_direction = 'right'
-                    print(f"\n--- TURN DETECTED! Now facing "
-                          f"{facing_direction.upper()} ---")
-                    # Add a small cooldown to prevent multiple flips
-                    time.sleep(0.5)
-                    peak_yaw_rate = 0.0  # Reset after action
+            # OLD: Gyroscope-based turn detection (replaced with rotation_vector)
+            # elif sensor_type == 'gyroscope':
+            #     vals = parsed_json['values']
+            #     yaw_rate = vals['z']
+            #     # Track peak for tuning
+            #     peak_yaw_rate = max(peak_yaw_rate, abs(yaw_rate))
+            #
+            #     if abs(yaw_rate) > TURN_THRESHOLD:
+            #         # Flip the direction
+            #         if facing_direction == 'right':
+            #             facing_direction = 'left'
+            #         else:
+            #             facing_direction = 'right'
+            #         print(f"\n--- TURN DETECTED! Now facing "
+            #               f"{facing_direction.upper()} ---")
+            #         # Add a small cooldown to prevent multiple flips
+            #         time.sleep(0.5)
+            #         peak_yaw_rate = 0.0  # Reset after action
 
             walk_status = "WALKING" if is_walking else "IDLE"
             # Updated dashboard to show facing direction instead of tilt
@@ -225,7 +248,7 @@ try:
             )
             print(dashboard_string, end="")
 
-        except (json.JSONDecodeError, KeyError) as e:
+        except (json.JSONDecodeError, KeyError):
             # Temporarily print errors to see if we have issues
             # print(f"Error processing packet: {e}")
             pass
@@ -233,7 +256,7 @@ try:
 except KeyboardInterrupt:
     print("\nController stopped.")
 finally:
-    if is_walking:
+    if is_walking and walking_thread is not None:
         stop_walking_event.set()
         walking_thread.join()
     release_tilt_key()
