@@ -15,6 +15,32 @@ walking_thread = None
 stop_walking_event = threading.Event()
 # NEW: The core state for our character's direction
 facing_direction = 'right'
+# NEW: A variable to store the phone's current orientation
+last_known_orientation = {'x': 0, 'y': 0, 'z': 0, 'w': 1}  # Initialize to no rotation
+
+
+# --- NEW: The core mathematical helper function ---
+def rotate_vector_by_quaternion(vector, quat):
+    """Rotates a 3D vector by a quaternion using standard quaternion rotation formula."""
+    q_vec = [quat['x'], quat['y'], quat['z']]
+    q_scalar = quat['w']
+    
+    # Standard formula for vector rotation by quaternion
+    a = [2 * (q_vec[1] * vector[2] - q_vec[2] * vector[1]),
+         2 * (q_vec[2] * vector[0] - q_vec[0] * vector[2]),
+         2 * (q_vec[0] * vector[1] - q_vec[1] * vector[0])]
+    
+    b = [q_scalar * a[0], q_scalar * a[1], q_scalar * a[2]]
+    
+    c = [q_vec[1] * a[2] - q_vec[2] * a[1],
+         q_vec[2] * a[0] - q_vec[0] * a[2],
+         q_vec[0] * a[1] - q_vec[1] * a[0]]
+         
+    rotated_vector = [vector[0] + b[0] + c[0],
+                      vector[1] + b[1] + c[1],
+                      vector[2] + b[2] + c[2]]
+                      
+    return rotated_vector
 
 # --- Configuration Loading ---
 def load_config():

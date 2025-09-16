@@ -2,8 +2,16 @@ import socket
 import json
 import time
 import math
-import statistics  # NEW: For calculating mean and standard deviation
-import sys  # NEW: For command line arguments
+import statistics  # For calculating mean and standard deviation
+import sys  # For command line arguments
+
+# --- NEW: A helper function to display instructions clearly ---
+def show_instructions(message):
+    """Prints a message and waits for the user to acknowledge."""
+    print("\n" + "="*50)
+    print(message)
+    print("="*50)
+    input("Press [Enter] when you are ready to continue...")
 
 
 def load_config():
@@ -95,9 +103,15 @@ def get_stable_azimuth(sock):
 
 def calibrate_punch(config, sock):
     """Guides the user through calibrating the punch gesture."""
-    print("\n--- Calibrating PUNCH ---")
-    print("You will be asked to perform 3 punches.")
-    print("Please perform a sharp, forward shake or punch motion each time.")
+
+    instruction_message = (
+        "--- Calibrating PUNCH ---\n\n"
+        "First, adopt your COMBAT STANCE.\n"
+        "Most users hold the phone like a handle or sword grip, with the\n"
+        "screen facing sideways (e.g., to your left if right-handed).\n\n"
+        "We will record 3 sharp, forward PUNCH motions from this stance."
+    )
+    show_instructions(instruction_message)
 
     peak_readings = []
     num_samples = 3
@@ -146,10 +160,14 @@ def calibrate_punch(config, sock):
 
 def calibrate_jump(config, sock):
     """Guides the user through calibrating the jump gesture."""
-    print("\n--- Calibrating JUMP ---")
-    print("You will be asked to perform 3 jumps.")
-    print("Please perform a sharp, upward 'hop' motion with the phone "
-          "each time.")
+
+    instruction_message = (
+        "--- Calibrating JUMP ---\n\n"
+        "For this, adopt a NEUTRAL STANCE.\n"
+        "Hold the phone flat like a plate, with the screen facing UP.\n\n"
+        "We will record 3 sharp, upward HOP motions from this stance."
+    )
+    show_instructions(instruction_message)
 
     peak_readings = []
     num_samples = 3
@@ -198,8 +216,14 @@ def calibrate_jump(config, sock):
 
 def calibrate_turn(config, sock):
     """Guides user through calibrating turn gesture based on azimuth change."""
-    print("\n--- Calibrating TURN ---")
-    print("This will measure how you perform a full 180-degree body turn.")
+
+    instruction_message = (
+        "--- Calibrating TURN ---\n\n"
+        "Adopt your TRAVEL STANCE.\n"
+        "This is usually by your side, as if you were walking naturally.\n\n"
+        "You will face a direction, press Enter, then turn 180° and press Enter again."
+    )
+    show_instructions(instruction_message)
 
     turn_magnitudes = []
     num_samples = 3
@@ -244,9 +268,13 @@ def calibrate_turn(config, sock):
 
 def calibrate_walking(config, sock):
     """Guides user through rhythm test to calibrate walking parameters."""
-    print("\n--- Calibrating WALKING RHYTHM ---")
-    input("Press [Enter] to begin a 10-second walking test...")
 
+    instruction_message = (
+        "--- Calibrating WALKING RHYTHM ---\n\n"
+        "Please remain in your TRAVEL STANCE.\n\n"
+        "We will record your natural walking pace for 10 seconds."
+    )
+    show_instructions(instruction_message)
     print("Get ready to walk in place at a comfortable, natural pace.")
     time.sleep(1)
     print("GO!")
@@ -307,6 +335,13 @@ def main():
                config['network']['listen_port']))
     sock.setblocking(False)
 
+
+    print("="*50)
+    print(" Welcome to the Silksong Controller Calibrator")
+    print("="*50)
+    print("\nThis tool will personalize the controller to your unique movements.")
+    print("Please follow the on-screen instructions carefully.")
+
     # Check for command line arguments
     if len(sys.argv) > 1:
         gesture = sys.argv[1].lower()
@@ -326,17 +361,16 @@ def main():
             sock.close()
             return
     else:
-        print("Welcome to the Silksong Controller Calibrator.")
-        print("Running full calibration suite...")
-        # Run the full suite of calibrations sequentially
+        # Run the full suite of calibrations with clear instructions
         calibrate_punch(config, sock)
         calibrate_jump(config, sock)
-        calibrate_turn(config, sock)
         calibrate_walking(config, sock)
+        calibrate_turn(config, sock)
+
 
     sock.close()  # Clean up the socket
+    print("\n--- Calibration Complete! ---")
     save_config(config)
-    print("Calibration complete! Updated config.json saved.")
 
 
 if __name__ == "__main__":

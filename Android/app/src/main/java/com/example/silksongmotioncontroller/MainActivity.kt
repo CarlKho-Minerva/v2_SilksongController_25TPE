@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // --- NEW: UI View for the gyroscope sensor ---
     private lateinit var gyroStatusView: TextView
 
-    private val MAC_IP_ADDRESS = "192.168.10.234"
+    private val MAC_IP_ADDRESS = "192.168.0.247"
     private val UDP_PORT = 12345
 
     // --- NEW: Constant for the permission request ---
