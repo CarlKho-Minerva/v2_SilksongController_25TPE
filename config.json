@@ -4,11 +4,11 @@
         "listen_port": 12345
     },
     "thresholds": {
-        "fuel_added_per_step_sec": 0.6,
-        "max_fuel_sec": 1.2,
-        "punch_threshold_xy_accel": 32.32448883298176,
-        "jump_threshold_z_accel": 20.393476867983168,
-        "turn_threshold_degrees": 97.29080303377795
+        "fuel_added_per_step_sec": 0.5417109619487416,
+        "max_fuel_sec": 1.3001063086769797,
+        "punch_threshold_xy_accel": 30.06625839719142,
+        "jump_threshold_z_accel": 25.86142550070845,
+        "turn_threshold_degrees": 102.70223989686392
     },
     "keyboard_mappings": {
         "left": "Key.left",
