@@ -8,7 +8,7 @@ The Silksong Motion Controller transforms your Android phone's built-in sensors 
 
 **Key Features:**
 - 🚶‍♂️ **Walk in place** → Character moves left/right
-- 🦘 **Jump up** → Character jumps  
+- 🦘 **Jump up** → Character jumps
 - 👊 **Punch forward** → Character attacks
 - 🔄 **Turn your body** → Change character direction
 - 📱 **Wireless** → No cables needed, just Wi-Fi
@@ -51,7 +51,7 @@ Before starting, make sure you have:
    ```bash
    pip install -r requirements.txt
    ```
-   
+
    **Windows users**: If you get errors, try:
    ```bash
    pip install pynput windows-curses
@@ -78,19 +78,19 @@ Before starting, make sure you have:
 **IMPORTANT**: Both your computer and phone must be on the same Wi-Fi network.
 
 1. **Find your computer's IP address**:
-   
+
    **Windows**:
    ```cmd
    ipconfig
    ```
    Look for "IPv4 Address" under your Wi-Fi adapter (e.g., `192.168.1.100`)
-   
+
    **Mac**:
    ```bash
    ifconfig
    ```
    Look for "inet" under your Wi-Fi interface (e.g., `192.168.1.100`)
-   
+
    **Linux**:
    ```bash
    ip addr show
@@ -123,7 +123,7 @@ python3 calibrate.py
 
 Follow the on-screen instructions to calibrate:
 1. **Punch calibration**: Hold phone like a sword, do 3 forward punches
-2. **Jump calibration**: Hold phone naturally, do 3 upward hops  
+2. **Jump calibration**: Hold phone naturally, do 3 upward hops
 3. **Walking calibration**: Walk in place for 10 seconds
 4. **Turn calibration**: Turn your body left and right
 
@@ -142,7 +142,7 @@ Hold your phone naturally (like a TV remote) and:
 
 - **Walk in place** → Character moves in the direction you're facing
 - **Quick upward hop** → Character jumps (Z key)
-- **Forward punch motion** → Character attacks (X key)  
+- **Forward punch motion** → Character attacks (X key)
 - **Turn your body left/right** → Changes character direction
 - **Stop walking** → Character stops (after a short momentum delay)
 
@@ -246,12 +246,12 @@ Edit `config.json` to customize:
 
 **Sensitivity Settings** (lower = more sensitive):
 - `punch_threshold_xy_accel`: Punch detection sensitivity
-- `jump_threshold_z_accel`: Jump detection sensitivity  
+- `jump_threshold_z_accel`: Jump detection sensitivity
 - `turn_threshold_degrees`: Body turn sensitivity
 
 **Game Controls**:
 - `left`/`right`: Movement keys (default: arrow keys)
-- `jump`: Jump key (default: "z") 
+- `jump`: Jump key (default: "z")
 - `attack`: Attack key (default: "x")
 
 **Walking Settings**:
@@ -289,6 +289,7 @@ This project is open source. Feel free to use, modify, and share!
 - Check out the [demo videos](#-demo-videos) for a technical walkthrough
 - Read through the source code - it's well-commented!
 
+[ai](https://aistudio.google.com/prompts/1NZCQ1oS7LE5Ajk0Z3ptDyzvItO1PWNkK)
 ---
 
 **Ready to play? Start with [Step 1: Computer Setup](#step-1-computer-setup)!** 🎮
