@@ -125,7 +125,7 @@ def quaternion_to_roll(qx, qy, qz, qw):
 
 def quaternion_to_euler(q):
     """Converts a quaternion dict into yaw, pitch, roll in degrees."""
-    x, y, z, w = q['x'], q['y'], q['z'], q['w']
+    x, y, z, w = q["x"], q["y"], q["z"], q["w"]
 
     # Roll (x-axis rotation)
     sinr_cosp = 2 * (w * x + y * z)
@@ -213,7 +213,7 @@ try:
                 yaw, pitch, roll = quaternion_to_euler(vals)
 
                 # Add current orientation to our history
-                orientation_history.append({'yaw': yaw, 'pitch': pitch, 'roll': roll})
+                orientation_history.append({"yaw": yaw, "pitch": pitch, "roll": roll})
 
                 # Check for a turn only if our history buffer is full
                 if len(orientation_history) == orientation_history.maxlen:
@@ -221,12 +221,21 @@ try:
                     current_orientation = orientation_history[-1]
 
                     # Calculate change in all three angles
-                    yaw_diff = 180 - abs(abs(current_orientation['yaw'] - oldest_orientation['yaw']) - 180)
-                    pitch_diff = abs(current_orientation['pitch'] - oldest_orientation['pitch'])
-                    roll_diff = abs(current_orientation['roll'] - oldest_orientation['roll'])
+                    yaw_diff = 180 - abs(
+                        abs(current_orientation["yaw"] - oldest_orientation["yaw"])
+                        - 180
+                    )
+                    pitch_diff = abs(
+                        current_orientation["pitch"] - oldest_orientation["pitch"]
+                    )
+                    roll_diff = abs(
+                        current_orientation["roll"] - oldest_orientation["roll"]
+                    )
 
                     # NEW: The Stability Check
-                    is_stable = (pitch_diff < STABILITY_THRESHOLD_DEGREES) and (roll_diff < STABILITY_THRESHOLD_DEGREES)
+                    is_stable = (pitch_diff < STABILITY_THRESHOLD_DEGREES) and (
+                        roll_diff < STABILITY_THRESHOLD_DEGREES
+                    )
 
                     if yaw_diff > TURN_THRESHOLD and is_stable:
                         print("\n--- STABLE TURN DETECTED! ---")
@@ -236,7 +245,7 @@ try:
                             facing_direction = "right"
                         print(f"Now facing {facing_direction.upper()}")
 
-                         # --- NEW: Deplete walk fuel for a sharp turn ---
+                        # --- NEW: Deplete walk fuel for a sharp turn ---
                         walk_fuel_seconds = 0.2
                         # Clear to prevent multiple triggers
                         orientation_history.clear()
