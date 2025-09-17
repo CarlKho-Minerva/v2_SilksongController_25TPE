@@ -1,1 +1,6 @@
-pynput
+# Silksong Motion Controller Dependencies
+# Core library for keyboard control
+pynput>=1.7.0
+
+# Note: On Windows, you may also need:
+# windows-curses  # Uncomment this line if you're on Windows
