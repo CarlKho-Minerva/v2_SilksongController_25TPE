@@ -7,6 +7,7 @@ Turn your Android phone into a wireless motion controller for Hollow Knight, Sil
 The Silksong Motion Controller transforms your Android phone's built-in sensors into game controls. Walk in place to move your character, jump to make them jump, punch to attack, and turn your body to change direction. It's like playing the game with your whole body!
 
 **Key Features:**
+
 - 🚶‍♂️ **Walk in place** → Character moves left/right
 - 🦘 **Jump up** → Character jumps
 - 👊 **Punch forward** → Character attacks
@@ -48,11 +49,13 @@ Before starting, make sure you have:
    - **Linux**: Right-click in the folder → "Open in Terminal"
 
 4. **Install dependencies**:
+
    ```bash
    pip install -r requirements.txt
    ```
 
    **Windows users**: If you get errors, try:
+
    ```bash
    pip install pynput windows-curses
    ```
@@ -80,21 +83,27 @@ Before starting, make sure you have:
 1. **Find your computer's IP address**:
 
    **Windows**:
+
    ```cmd
    ipconfig
    ```
+
    Look for "IPv4 Address" under your Wi-Fi adapter (e.g., `192.168.1.100`)
 
    **Mac**:
+
    ```bash
    ifconfig
    ```
+
    Look for "inet" under your Wi-Fi interface (e.g., `192.168.1.100`)
 
    **Linux**:
+
    ```bash
    ip addr show
    ```
+
    Look for your wireless interface's inet address
 
 2. **Update the configuration**:
@@ -113,21 +122,24 @@ Before starting, make sure you have:
 The controller needs to learn your unique movements. This step is essential!
 
 **Easy way** (double-click the file):
+
 - **Windows**: Double-click `run_calibration.bat`
 - **Mac/Linux**: Double-click `run_calibration.sh`
 
 **Command line way**:
+
 ```bash
 python3 calibrate.py
 ```
 
 Follow the on-screen instructions to calibrate:
+
 1. **Punch calibration**: Hold phone like a sword, do 3 forward punches
 2. **Jump calibration**: Hold phone naturally, do 3 upward hops
 3. **Walking calibration**: Walk in place for 10 seconds
 4. **Turn calibration**: Turn your body left and right
 
-### Step 5: Playing the Game!
+### Step 5: Playing the Game
 
 1. **Start your game** (Hollow Knight, etc.) and make sure it's focused
 2. **Start the controller**:
@@ -151,11 +163,13 @@ Hold your phone naturally (like a TV remote) and:
 ### "Connection failed" / "No data received"
 
 **Check your network**:
+
 - Both devices on same Wi-Fi? (Not mobile data!)
 - Correct IP address in `config.json`?
 - Firewall blocking port 12345?
 
 **Windows Firewall Fix**:
+
 1. Windows Security → Firewall & network protection
 2. "Allow an app through firewall"
 3. Add Python.exe with both Private and Public checked
@@ -163,11 +177,13 @@ Hold your phone naturally (like a TV remote) and:
 ### "ModuleNotFoundError: No module named 'pynput'"
 
 **Run the install command**:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 **Windows users try**:
+
 ```bash
 pip install pynput windows-curses
 ```
@@ -175,6 +191,7 @@ pip install pynput windows-curses
 ### "Permission denied" or "Could not bind to port"
 
 **Port already in use**:
+
 - Close any running `udp_listener.py` or `calibrate.py`
 - Change port in `config.json` to something else (e.g., 12346)
 - Update the Android app with the new port
@@ -182,11 +199,13 @@ pip install pynput windows-curses
 ### Controller feels unresponsive
 
 **Re-run calibration**:
+
 ```bash
 python3 calibrate.py
 ```
 
 **Adjust sensitivity**:
+
 - Edit `config.json` → lower the threshold values
 - `punch_threshold_xy_accel`: Lower = more sensitive punches
 - `jump_threshold_z_accel`: Lower = easier jumping
@@ -194,10 +213,12 @@ python3 calibrate.py
 ### Android app won't install
 
 **Enable unknown sources**:
+
 1. Settings → Apps → Menu → Special access
 2. "Install unknown apps" → Your file manager → Allow
 
 **Alternative method**:
+
 1. Settings → Security → "Unknown sources" → Enable
 2. Install the APK
 3. **Important**: Disable "Unknown sources" afterward
@@ -241,20 +262,24 @@ SilksongController/
 Edit `config.json` to customize:
 
 **Network Settings**:
+
 - `listen_ip`: Your computer's IP address
 - `listen_port`: Network port (default 12345)
 
 **Sensitivity Settings** (lower = more sensitive):
+
 - `punch_threshold_xy_accel`: Punch detection sensitivity
 - `jump_threshold_z_accel`: Jump detection sensitivity
 - `turn_threshold_degrees`: Body turn sensitivity
 
 **Game Controls**:
+
 - `left`/`right`: Movement keys (default: arrow keys)
 - `jump`: Jump key (default: "z")
 - `attack`: Attack key (default: "x")
 
 **Walking Settings**:
+
 - `fuel_added_per_step_sec`: How much movement each step provides
 - `max_fuel_sec`: Maximum movement duration per step
 
@@ -268,6 +293,7 @@ Want to improve the controller? Here's how:
 4. **Submit a pull request**
 
 **Ideas for contributions**:
+
 - Support for more games
 - Additional gesture recognition
 - iOS app version
@@ -281,15 +307,16 @@ This project is open source. Feel free to use, modify, and share!
 ## 🆘 Getting Help
 
 **Having issues?**
+
 1. Check the [Troubleshooting](#-troubleshooting) section above
 2. Open an [Issue](../../issues) with details about your problem
 3. Include your operating system, Python version, and error messages
 
 **Questions about the technical details?**
+
 - Check out the [demo videos](#-demo-videos) for a technical walkthrough
 - Read through the source code - it's well-commented!
 
-[ai](https://aistudio.google.com/prompts/1NZCQ1oS7LE5Ajk0Z3ptDyzvItO1PWNkK)
 ---
 
 **Ready to play? Start with [Step 1: Computer Setup](#step-1-computer-setup)!** 🎮
