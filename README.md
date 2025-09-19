@@ -2,6 +2,8 @@
 
 Turn your Android phone into a wireless motion controller for Hollow Knight, Silksong, or any 2D platformer game! Use natural body movements like walking, jumping, and punching to control your character.
 
+<div style="position: relative; padding-bottom: 64.98194945848375%; height: 0;"><iframe src="https://www.loom.com/embed/4d72524a71874e30b9bc01b4dfbae1dd?sid=7deeedac-48d4-4bf1-806b-b52e0a5534f9" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>
+
 ## 🎮 What is this?
 
 The Silksong Motion Controller transforms your Android phone's built-in sensors into game controls. Walk in place to move your character, jump to make them jump, punch to attack, and turn your body to change direction. It's like playing the game with your whole body!

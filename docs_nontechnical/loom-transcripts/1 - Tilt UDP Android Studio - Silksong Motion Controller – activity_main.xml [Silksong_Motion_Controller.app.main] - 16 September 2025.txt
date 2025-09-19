@@ -1,0 +1,30 @@
+hey everyone quickly documenting my progress for silksong controller and this is v2 because v1
+
+wasn't as good but anyway i am slowly as inspired by downhill invention by valentino brittenberg
+
+and prof watson's assistants i have incrementally and slowly added simple sensors
+
+so previous view one which is the clash and idea dump and this is actually doing things
+
+cautiously a test driven development technique enough about that the demo here will be having
+
+specific access to our tilt sensor specifically our specifically our role and so let's see what we can do
+
+why is this still here
+
+So if I start this and I turn on the sensor screen, we can see that we have
+
+a status bar. Why isn't this moving? There we go. A status bar. So right now it's kind of flat,
+
+but if we go beyond -20 or to the left, we can see state here.
+
+we can see that it's pressing A. And when it goes back, press D, press D, press D, press D.
+
+And I'm pretty proud of that because a bit of context.
+
+I started by having a button send a UDB packet and then started replacing buttons which switches
+
+for a sensor oh i don't have the results anymore but data packet transfer so it happens and now
+
+we're getting specific data which is this rotation sensor that's it
+
