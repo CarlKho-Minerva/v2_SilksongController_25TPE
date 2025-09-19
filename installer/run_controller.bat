@@ -11,5 +11,5 @@ echo.
 echo Press Ctrl+C to stop the controller
 echo.
 
-python udp_listener.py
+python ../udp_listener.py
 pause

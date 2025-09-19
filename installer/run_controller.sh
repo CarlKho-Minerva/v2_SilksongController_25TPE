@@ -11,4 +11,4 @@ echo ""
 echo "Press Ctrl+C to stop the controller"
 echo ""
 
-python3 udp_listener.py
+python3 ../udp_listener.py
