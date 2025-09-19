@@ -4,9 +4,6 @@ Turn your Android phone into a wireless motion controller for Hollow Knight, Sil
 
 <div>
     <a href="https://www.loom.com/share/4d72524a71874e30b9bc01b4dfbae1dd">
-      <p>4 Motion → Silksong IT WORKS! - Code - udp_listener.py — v2_SilksongController_25TPE - 17 September 2025 - Watch Video</p>
-    </a>
-    <a href="https://www.loom.com/share/4d72524a71874e30b9bc01b4dfbae1dd">
       <img style="max-width:80vw;" src="https://cdn.loom.com/sessions/thumbnails/4d72524a71874e30b9bc01b4dfbae1dd-9d8fd821e32bc4fe-full-play.gif">
     </a>
   </div>
