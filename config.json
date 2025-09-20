@@ -4,11 +4,11 @@
         "listen_port": 12345
     },
     "thresholds": {
-        "fuel_added_per_step_sec": 0.8,
-        "max_fuel_sec": 1.6,
-        "punch_threshold_xy_accel": 25.0,
-        "jump_threshold_z_accel": 20.0,
-        "turn_threshold_degrees": 90.0
+        "fuel_added_per_step_sec": 0.4,
+        "max_fuel_sec": 1.0,
+        "punch_threshold_xy_accel": 35.06112504247542,
+        "jump_threshold_z_accel": 33.64638131280011,
+        "turn_threshold_degrees": 123.6716623416228
     },
     "keyboard_mappings": {
         "left": "Key.left",

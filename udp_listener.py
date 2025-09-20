@@ -22,6 +22,10 @@ last_known_orientation = {"x": 0, "y": 0, "z": 0, "w": 1}
 walk_fuel_seconds = 0.0
 last_frame_time = time.time()
 
+# --- NEW: Attack debouncing to prevent rapid-fire attacks ---
+last_attack_time = 0
+ATTACK_COOLDOWN_SEC = 0.3  # Minimum time between attacks
+
 
 # --- NEW: The core mathematical helper function ---
 def rotate_vector_by_quaternion(vector, quat):
@@ -95,6 +99,8 @@ JUMP_THRESHOLD = config["thresholds"]["jump_threshold_z_accel"]
 TURN_THRESHOLD = config["thresholds"]["turn_threshold_degrees"]
 # NEW: Hardcoded stability threshold for pitch/roll stability check
 STABILITY_THRESHOLD_DEGREES = 40.0
+# NEW: Z-axis stability factor for attack detection (prevents attack during jumps)
+ATTACK_Z_STABILITY_FACTOR = 0.7  # Z-axis must be < punch_threshold * this factor
 
 # Load key mappings from config
 KEY_MAP = {
@@ -287,6 +293,8 @@ try:
                 peak_xy_accel = max(peak_xy_accel, world_xy_magnitude)
 
                 # Detection logic uses the new world values
+                current_time = time.time()
+
                 if world_z > JUMP_THRESHOLD:
                     print("\n--- JUMP DETECTED! ---")
                     keyboard.press(KEY_MAP["jump"])
@@ -295,12 +303,20 @@ try:
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
-                # If not a jump, check for an ATTACK (strong horizontal motion)
-                elif world_xy_magnitude > PUNCH_THRESHOLD:
-                    print("\n--- ATTACK DETECTED! ---")
+                # Attack detection with improved conditions to prevent conflicts with jumps
+                elif (
+                    world_xy_magnitude > PUNCH_THRESHOLD
+                    and abs(world_z) < PUNCH_THRESHOLD * ATTACK_Z_STABILITY_FACTOR
+                    and current_time - last_attack_time > ATTACK_COOLDOWN_SEC
+                ):
+                    print(
+                        f"\n--- ATTACK DETECTED! --- (XY: {world_xy_magnitude:.1f}, Z: {world_z:.1f})"
+                    )
                     keyboard.press(KEY_MAP["attack"])
                     time.sleep(0.1)
                     keyboard.release(KEY_MAP["attack"])
+                    # Update last attack time for debouncing
+                    last_attack_time = current_time
                     # Reset peaks after an action
                     peak_z_accel, peak_xy_accel = 0.0, 0.0
 
