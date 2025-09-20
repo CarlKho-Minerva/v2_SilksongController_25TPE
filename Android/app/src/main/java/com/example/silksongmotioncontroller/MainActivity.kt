@@ -1,6 +1,8 @@
 package com.example.silksongmotioncontroller
 
 import android.Manifest // NEW: Import for permissions
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -10,6 +12,8 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
@@ -39,8 +43,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // --- NEW: UI View for the gyroscope sensor ---
     private lateinit var gyroStatusView: TextView
 
-    private val MAC_IP_ADDRESS = "192.168.10.135"
+    // --- NEW: IP address management ---
+    private lateinit var ipAddressEditText: EditText
+    private lateinit var saveIpButton: Button
+    private lateinit var ipStatusTextView: TextView
+    private lateinit var sharedPreferences: SharedPreferences
+    private var currentServerIP = "192.168.10.234" // Default IP
+
     private val UDP_PORT = 12345
+    private val PREFS_NAME = "SilksongController"
+    private val IP_ADDRESS_KEY = "server_ip_address"
 
     // --- NEW: Constant for the permission request ---
     private val ACTIVITY_RECOGNITION_REQUEST_CODE = 100
@@ -49,12 +61,28 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Initialize SharedPreferences
+        sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // Initialize UI components
         val streamSwitch: SwitchCompat = findViewById(R.id.switch_stream)
-        rotationStatusView = findViewById(R.id.tv_status_rotation) // Assuming you added this
+        rotationStatusView = findViewById(R.id.tv_status_rotation)
         stepStatusView = findViewById(R.id.tv_status_step)
-        // --- NEW: Initialize the new TextView ---
         accelStatusView = findViewById(R.id.tv_status_accel)
-        gyroStatusView = findViewById(R.id.tv_status_gyro) // Initialize the new TextView
+        gyroStatusView = findViewById(R.id.tv_status_gyro)
+
+        // Initialize IP management UI
+        ipAddressEditText = findViewById(R.id.et_ip_address)
+        saveIpButton = findViewById(R.id.btn_save_ip)
+        ipStatusTextView = findViewById(R.id.tv_ip_status)
+
+        // Load saved IP address or use default
+        loadSavedIpAddress()
+
+        // Set up IP save button
+        saveIpButton.setOnClickListener {
+            saveIpAddress()
+        }
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
@@ -179,12 +207,56 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         try {
             val socket = DatagramSocket()
             val messageBytes = message.toByteArray()
-            val serverAddress = InetAddress.getByName(MAC_IP_ADDRESS)
+            val serverAddress = InetAddress.getByName(currentServerIP)
             val packet = DatagramPacket(messageBytes, messageBytes.size, serverAddress, UDP_PORT)
             socket.send(packet)
             socket.close()
         } catch (e: Exception) {
             Log.e("UDP_SENDER", "Error sending packet", e)
+        }
+    }
+
+    private fun loadSavedIpAddress() {
+        currentServerIP = sharedPreferences.getString(IP_ADDRESS_KEY, "192.168.10.234") ?: "192.168.10.234"
+        ipAddressEditText.setText(currentServerIP)
+        updateIpStatusDisplay()
+    }
+
+    private fun saveIpAddress() {
+        val newIpAddress = ipAddressEditText.text.toString().trim()
+
+        if (isValidIpAddress(newIpAddress)) {
+            currentServerIP = newIpAddress
+
+            // Save to SharedPreferences
+            with(sharedPreferences.edit()) {
+                putString(IP_ADDRESS_KEY, currentServerIP)
+                apply()
+            }
+
+            updateIpStatusDisplay()
+            Toast.makeText(this, "IP address saved: $currentServerIP", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Invalid IP address format", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateIpStatusDisplay() {
+        ipStatusTextView.text = "Current IP: $currentServerIP"
+    }
+
+    private fun isValidIpAddress(ip: String): Boolean {
+        return try {
+            val parts = ip.split(".")
+            if (parts.size != 4) return false
+
+            for (part in parts) {
+                val num = part.toInt()
+                if (num < 0 || num > 255) return false
+            }
+            true
+        } catch (e: NumberFormatException) {
+            false
         }
     }
 

@@ -5,6 +5,7 @@ import math
 import threading
 from collections import deque
 from pynput.keyboard import Controller, Key
+import network_utils
 
 # --- Global State ---
 keyboard = Controller()
@@ -76,6 +77,12 @@ def get_key(key_string):
 
 
 # Load configuration at startup
+config = load_config()
+
+# Auto-detect and update IP address
+print("🔍 Auto-detecting IP address...")
+network_utils.update_config_ip()
+# Reload config to get the updated IP
 config = load_config()
 
 # Extract configuration values

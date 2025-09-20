@@ -4,6 +4,7 @@ import time
 import math
 import statistics  # For calculating mean and standard deviation
 import sys  # For command line arguments
+import network_utils
 
 
 # --- NEW: A helper function to display instructions clearly ---
@@ -397,6 +398,12 @@ def calibrate_walking(config, sock):
 
 def main():
     """Main function to run the calibrator wizard."""
+    config = load_config()
+
+    # Auto-detect and update IP address
+    print("🔍 Auto-detecting IP address...")
+    network_utils.update_config_ip()
+    # Reload config to get the updated IP
     config = load_config()
 
     # Set up the socket once for all calibrations
