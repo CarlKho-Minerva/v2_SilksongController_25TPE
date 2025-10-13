@@ -3,8 +3,11 @@
 Turn your Android phone into a wireless motion controller for Hollow Knight, Silksong, or any 2D platformer game! Use natural body movements like walking, jumping, and punching to control your character.
 
 <div>
-    <a href="https://www.loom.com/share/4d72524a71874e30b9bc01b4dfbae1dd">
-      <img style="max-width:80vw;" src="https://cdn.loom.com/sessions/thumbnails/4d72524a71874e30b9bc01b4dfbae1dd-9d8fd821e32bc4fe-full-play.gif">
+    <a href="https://www.loom.com/share/727b750b191f4f1abde98fd024e2e8de">
+      <p>Silksong Demo - Body Controller (Android → UDP → Pynput) - Watch Video</p>
+    </a>
+    <a href="https://www.loom.com/share/727b750b191f4f1abde98fd024e2e8de">
+      <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/727b750b191f4f1abde98fd024e2e8de-87d14dbf256e2fd6-full-play.gif">
     </a>
   </div>
 
